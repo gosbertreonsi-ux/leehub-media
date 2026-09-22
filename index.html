@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PlayHub</title>
+<link rel="stylesheet" href="styles.css">
+<!-- Payment & Membership Gateway Integration -->
+<script src="https://jsdelivr.net"></script>
+<!-- Secure Stripe Payment Engine -->
+<script src="https://stripe.com"></script>
+</head>
+<body>
+
+<div class="topnav">
+  <div class="brand"><div class="mark"></div><span>PlayHub</span></div>
+  <div class="searchwrap">
+    <div class="searchbar">
+      <input type="text" placeholder="Search">
+      <button>🔍</button>
+    </div>
+  </div>
+  <div class="nav-icons">
+    <button class="icon-btn">🔁</button>
+    <button class="icon-btn">🔔</button>
+    <div class="avatar">JD</div>
+  </div>
+</div>
+
+<div class="layout" id="layout">
+  <aside class="sidebar">
+    <div class="side-item active"><span class="ic">⌂</span> Home</div>
+    <div class="side-item"><span class="ic">⚡</span> Shorts</div>
+    <div class="side-item"><span class="ic">📺</span> Subscriptions</div>
+    <div class="side-sep"></div>
+    <div class="side-item"><span class="ic">👤</span> You</div>
+    <div class="side-item"><span class="ic">🕑</span> History</div>
+    <div class="side-sep"></div>
+    <div class="side-item"><span class="ic">🎵</span> Music</div>
+    <div class="side-item"><span class="ic">🎥</span> Movies</div>
+    <div class="side-item"><span class="ic">🔥</span> Trending</div>
+    <div class="side-sep"></div>
+    <a class="side-item" href="admin.html"><span class="ic">⚙</span> Admin dashboard</a>
+  </aside>
+
+  <main>
+    <div class="chips">
+      <div class="chip active">All</div>
+      <div class="chip">Music</div>
+      <div class="chip">Gaming</div>
+      <div class="chip">News</div>
+      <div class="chip">Live</div>
+      <div class="chip">Podcasts</div>
+      <div class="chip">Recently uploaded</div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" hidden>
+      <div class="empty-mark">🎥</div>
+      <h3>No videos yet</h3>
+      <p>Nothing has been uploaded by the admin yet. Check back soon.</p>
+    </div>
+  </main>
+</div>
+
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="gate-head"><div class="mark"></div><span>PlayHub</span></div>
+    <h2>Unlock your feed</h2>
+    <p class="sub">Your home feed is locked until checkout is complete. Enter payment details to continue watching.</p>
+
+    <div class="plan">
+      <span class="name">PlayHub Premium — monthly</span>
+      <span class="price">TSh 15,000</span>
+    </div>
+
+    <div class="method-tabs">
+      <button type="button" class="method-tab active" data-method="momo">Mobile Money</button>
+      <button type="button" class="method-tab" data-method="card">Card</button>
+    </div>
+
+    <form id="payForm">
+
+      <!-- Mobile money panel -->
+      <div class="panel" id="panel-momo">
+        <label class="group-label">Choose your network</label>
+        <div class="operators" id="operators">
+          <button type="button" class="op active" data-op="mpesa" data-color="#4dba2b">
+            <span class="op-dot" style="background:#4dba2b"></span>M-Pesa
+          </button>
+          <button type="button" class="op" data-op="tigopesa" data-color="#0072ce">
+            <span class="op-dot" style="background:#0072ce"></span>Tigo Pesa
+          </button>
+          <button type="button" class="op" data-op="airtel" data-color="#ff3b3b">
+            <span class="op-dot" style="background:#ff3b3b"></span>Airtel Money
+          </button>
+          <button type="button" class="op" data-op="halopesa" data-color="#ffb800">
+            <span class="op-dot" style="background:#ffb800"></span>HaloPesa
+          </button>
+        </div>
+
+        <div class="field">
+          <label for="momoPhone">Mobile money number</label>
+          <div class="phone-input">
+            <span class="prefix">+255</span>
+            <input id="momoPhone" type="tel" inputmode="numeric" maxlength="9" placeholder="712 345 678">
+          </div>
+        </div>
+        <p class="hint" id="momoHint">You'll get a prompt on your phone from M-Pesa to confirm TSh 15,000.</p>
+      </div>
+
+      <!-- Card panel -->
+      <div class="panel" id="panel-card" hidden>
+        <div class="field">
+          <label for="cardName">Name on card</label>
+          <input id="cardName" type="text" placeholder="Jordan Diaz" autocomplete="cc-name">
+        </div>
+        <div class="field">
+          <label for="cardNum">Card number</label>
+          <input id="cardNum" type="text" inputmode="numeric" maxlength="19" placeholder="1234 5678 9012 3456" autocomplete="cc-number">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="cardExp">Expiry</label>
+            <input id="cardExp" type="text" maxlength="5" placeholder="MM/YY" autocomplete="cc-exp">
+          </div>
+          <div class="field">
+            <label for="cardCvc">CVC</label>
+            <input id="cardCvc" type="text" inputmode="numeric" maxlength="4" placeholder="123" autocomplete="cc-csc">
+          </div>
+        </div>
+      </div>
+
+      <p class="err" id="errMsg"></p>
+      <button type="submit" class="pay-btn" id="payBtn">Pay with M-Pesa</button>
+    </form>
+    <p class="fine">This is a demo form — no real payment is processed and no card or mobile money details leave this page.</p>
+  </div>
+</div>
+
+
+<!-- Secure Media Stream Overlay Player -->
+<div id="videoModal" style="display: none; position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; padding: 20px;">
+  <div style="position: relative; width: 100%; max-width: 800px; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid #303030;">
+    <!-- Close Button -->
+    <button onclick="closeVideoPlayer()" style="position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); border: 1px solid #444; color: #fff; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 16px; z-index: 10; display: flex; align-items: center; justify-content: center;">✕</button>
+    <!-- Dynamic Embed Container -->
+    <div id="playerContainer" style="width: 100%; height: 100%;">
+      <!-- HTML5 Native Player Fallback -->
+      <video id="nativePlayer" controls controlsList="nodownload" oncontextmenu="return false;" style="width: 100%; height: 100%; display: none;"></video>
+    </div>
+  </div>
+</div>
+
+
+<div class="unlocked-toast" id="toast">Payment confirmed — feed unlocked</div>
+
+<script src="script.js"></script>
+</body>
+</html>
