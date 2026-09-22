@@ -76,6 +76,15 @@
       setLocked(true);
       return;
     }
+
+        if (status.purchased && selectedVideo) {
+        launchVideoPlayer(selectedVideo);
+      } else if (selectedVideo) {
+        // Reads specific token values instantly to show pricing dynamically
+        var cost = selectedVideo.price && selectedVideo.price !== "0" ? "TSh " + parseInt(selectedVideo.price).toLocaleString() : "Premium Tokens";
+        alert("Pay-Per-View: This premium video requires a separate payment of " + cost + " to unlock.");
+      }
+
     
     var currentVideos = await loadAdminVideos();
     var selectedVideo = currentVideos.find(function(item) { return item.id === videoId; });
@@ -285,3 +294,46 @@
     e.target.value = v;
   });
 })();
+
+
+  // ---------- HEADER CHIP CONTENT FILTER ENGINE ----------
+  document.querySelectorAll(".chip").forEach(function(chipElement) {
+    chipElement.addEventListener("click", async function() {
+      // 1. Swap active UI layout styles cleanly
+      document.querySelectorAll(".chip").forEach(function(c) { c.classList.remove("active"); });
+      chipElement.classList.add("active");
+
+      var currentFilter = chipElement.textContent.trim().toLowerCase();
+      var currentVideos = await loadAdminVideos();
+      var gridContainer = document.getElementById("grid");
+
+      // 2. Clear out container state if "All" is active, otherwise loop filter metrics
+      if (currentFilter === "all") {
+        renderFeed(); // Renders everything
+        return;
+      }
+
+      // 3. Filter list objects by matching title parameters or channel signatures
+      var filteredMatches = currentVideos.filter(function(v) {
+        return v.title.toLowerCase().includes(currentFilter) || 
+               (v.channel && v.channel.toLowerCase().includes(currentFilter));
+      });
+
+      if (filteredMatches.length === 0) {
+        gridContainer.innerHTML = "";
+        document.getElementById("empty").hidden = false;
+        return;
+      }
+
+      document.getElementById("empty").hidden = true;
+      gridContainer.innerHTML = filteredMatches.map(function(v) {
+        var thumbStyle = v.thumb ? "background-image:url(" + v.thumb + ");" : "background:#333;";
+        return '<div class="card" onclick="verifyVideoAccess(\'' + v.id + '\')">'+
+          '<div class="thumb" style="'+thumbStyle+'"><span class="len">'+(v.length||"")+'</span></div>'+
+          '<div class="meta">'+
+            '<div class="ch-avatar" style="background:#555"></div>'+
+            '<div><h3>'+escapeHtml(v.title)+'</h3><p>'+escapeHtml(v.channel)+'</p></div>'+
+          '</div></div>';
+      }).join("");
+    });
+  });

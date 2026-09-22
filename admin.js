@@ -1,4 +1,30 @@
 (function(){
+
+    // ---------- ADMIN AUTENTICATION NODE ----------
+  function verifyAdminAccess() {
+    var sessionKey = window.sessionStorage.getItem("playhub_admin_auth");
+    
+    // Set your secret dashboard password here
+    var secretPasscode = "playhub2026"; 
+
+    if (sessionKey !== "verified") {
+      // Hide dashboard body elements to prevent visual leaks
+      document.body.style.display = "none";
+      
+      var attempt = prompt("Enter Admin Secure Passcode:");
+      if (attempt === secretPasscode) {
+        window.sessionStorage.setItem("playhub_admin_auth", "verified");
+        document.body.style.display = "block";
+      } else {
+        alert("Access Denied: Invalid Security Token.");
+        window.location.href = "index.html"; // Forwards intruders back to safety
+      }
+    }
+  }
+  // Run security scan immediately before rendering any dashboard lists
+  verifyAdminAccess();
+
+
   var STORAGE_KEY = "playhub_admin_videos";
   var BACKEND_API_URL = "https://onrender.com"; // Replace with your exact Render URL
 
@@ -83,18 +109,19 @@
     if(!/^\d{1,2}:\d{2}$/.test(length)){ errEl.textContent = "Length must look like 4:12."; return; }
     if(!pendingVideoData){ errEl.textContent = "Please select a valid movie file to upload."; return; }
 
-    // FIXED: Instead of embedding the massive raw video file block which breaks browser memory boundaries,
-    // we save a reference token string and pass a smooth testing stream path down to the client grid.
+    var priceInput = document.getElementById("vPrice").value.trim();
+
     var newVideo = {
       id: Date.now().toString(36),
       title: title,
       channel: channel,
       length: length,
       thumb: pendingThumb,
-      // Stores a safe reference. If you want a custom clip, paste its web URL right into the Description text box!
+      price: priceInput || "0", // Stores the specific value constraint
       desc: desc || "https://w3schools.com", 
       uploadedAt: new Date().toISOString()
     };
+
 
 
     var submitBtn = form.querySelector('button[type="submit"]');

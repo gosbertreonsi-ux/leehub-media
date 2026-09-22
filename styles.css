@@ -225,3 +225,35 @@ main{flex:1; min-width:0; padding:20px; position:relative;}
   z-index: 2;
   transition: opacity 0.2s ease;
 }
+
+/* ========== THEATER OVERLAY PLAYER THEME ========== */
+#videoModal {
+  backdrop-filter: blur(8px) !important;
+  transition: all 0.3s ease-in-out;
+}
+
+#playerContainer {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#nativePlayer {
+  outline: none;
+  background: #000;
+  object-fit: contain;
+}
+
+@keyframes modalSlideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Custom visual polish for the Premium Lock Indicator */
+.thumb::before {
+  background: linear-gradient(90deg, #ff3b3b, #ff5f5f) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+}
