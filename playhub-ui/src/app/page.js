@@ -188,18 +188,15 @@ export default function PlayHubHome() {
     return `${Math.round(hrs / 24)}d ago`;
   };
 
-  // MULTICRITERIA FILTER EXECUTOR: Searches titles, chips, channels, and pricing matrices
   const filteredVideos = videos.filter((v) => {
     const textQuery = searchQuery.toLowerCase();
     const chipQuery = activeChip.toLowerCase();
     
-    // Filter layer A: Header Text Query input
     const matchesSearch = !searchQuery || (
       v.title?.toLowerCase().includes(textQuery) ||
       v.channel?.toLowerCase().includes(textQuery)
     );
 
-    // Filter layer B: Categorization Quick Chip
     let matchesChip = true;
     if (activeChip === 'Premium') {
       matchesChip = parseInt(v.price) > 0;
@@ -271,8 +268,6 @@ export default function PlayHubHome() {
 
         {/* MAIN BODY FEED MATRIX OVERLAY */}
         <main className="flex-1 min-w-0 px-4 py-5 overflow-y-auto h-[calc(100vh-57px)]">
-          
-          {/* HORIZONTAL CATEGORIZATION QUICK CHIPS ROW */}
           <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar tracking-wide shrink-0">
             {['All', 'Action', 'Drama', 'Series', 'Dubbed', 'Premium', 'Free'].map((chip) => (
               <button
@@ -294,25 +289,31 @@ export default function PlayHubHome() {
             <div className="border border-[#303030] bg-[#181818] rounded-xl p-12 text-center max-w-sm mx-auto mt-12 shadow-xl">
               <span className="text-3xl block mb-2">🎬</span>
               <h4 className="text-sm font-bold text-white">No active broadcasts</h4>
-              <p className="text-xs text-[#aaaaaa] mt-1">No channels match the active matrix selection.</p>
+              <p className="text-xs text-[#aaaaaa] mt-1">No channels or links published match the active matrix selection.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-8 mt-2">
               {filteredVideos.map((v, idx) => {
                 const cleanPrice = parseInt(v.price) || 0;
                 const isPremiumItem = cleanPrice > 0;
+                const uniqueKey = v.id || `video-feed-${idx}`;
                 return (
                   <div
-                    key={v.id || idx}
+                    key={uniqueKey}
                     onClick={() => handleVerifyVideoAccess(v)}
                     className="group flex flex-col bg-[#121212] border border-[#242424] hover:border-[#383838] rounded-xl overflow-hidden cursor-pointer transition shadow-lg duration-200"
                   >
+                    {/* FIXED: Uses HTML img block to bypass CSS base64 string limitation blockers */}
                     <div className="relative aspect-video w-full bg-[#1c1c1c] overflow-hidden border-b border-[#242424]">
-                      <div
-                        className="w-full h-full bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
+                      <img
+                        src={v.thumb && !v.thumb.startsWith('linear') ? v.thumb : "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%231a1a1a'/></svg>"}
+                        alt={v.title || "Cover Artwork"}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         style={{
-                          backgroundImage: v.thumb && v.thumb.startsWith('linear') ? 'none' : `url(${v.thumb})`,
                           background: v.thumb && v.thumb.startsWith('linear') ? v.thumb : undefined
+                        }}
+                        onError={(e) => {
+                          e.target.src = "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%23222'/></svg>";
                         }}
                       />
                       {isPremiumItem && (
@@ -428,7 +429,7 @@ export default function PlayHubHome() {
                   dangerouslySetInnerHTML={{ __html: activeVideo.desc }}
                 />
               ) : (
-                <video src={activeVideo.desc || "https://w3schools.com"} controls autoPlay className="w-full h-full object-contain" />
+                <video src={activeVideo.desc || "https://w3schools.com"} controls playsInline className="w-full h-full object-contain" />
               )}
             </div>
           </div>

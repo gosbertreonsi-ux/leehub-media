@@ -139,6 +139,7 @@ export default function AdminDashboard() {
     };
     reader.readAsDataURL(file);
   };
+
   const handlePublishSubmit = async (e) => {
     e.preventDefault();
     setUploadError('');
@@ -149,11 +150,24 @@ export default function AdminDashboard() {
       return;
     }
 
+    // FIXED VERIFICATION CONDITIONAL: Demands a URL string ONLY if an external link provider is picked!
+    if (videoProvider !== 'local_file' && !videoUrl.trim()) {
+      setUploadError('Please provide an external streaming URL reference link or embed code.');
+      return;
+    }
+
+    // FIXED FILE VALIDATION: Ensures a file was attached if local file mode is selected
+    if (videoProvider === 'local_file' && !rawFileObject) {
+      setUploadError('Please select a local video file from your computer to upload.');
+      return;
+    }
+
     setIsPublishing(true);
     let finalLiveStreamUrl = videoUrl.trim();
+    const fixedUnifiedId = "vid_" + Math.random().toString(36).substring(2, 11);
 
     try {
-      // 🚀 HIGH-CAPACITY PIPELINE: Streaming files directly to bucket with real-time feedback meters
+      // 🚀 HIGH-CAPACITY PIPELINE: Streaming heavy files directly into the cloud bucket target
       if (videoProvider === 'local_file' && rawFileObject) {
         const fileExtension = rawFileObject.name.split('.').pop();
         const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
@@ -187,16 +201,10 @@ export default function AdminDashboard() {
         finalLiveStreamUrl = urlData.publicUrl;
       }
 
-      if (!finalLiveStreamUrl && videoProvider !== 'local_file') {
-        setUploadError('Please select a local video file or provide an external streaming URL.');
-        setIsPublishing(false);
-        return;
-      }
-
       const compiledSource = compileVideoDescription(finalLiveStreamUrl);
 
       const cleanVideoPayload = {
-        id: "vid_" + Date.now().toString(36),
+        id: fixedUnifiedId,
         title: title.trim(),
         channel: channel.trim(),
         length: length.trim() || 'Premium',
@@ -206,37 +214,35 @@ export default function AdminDashboard() {
         uploadedAt: new Date().toISOString()
       };
 
-      // Target A: Sync to Browser client LocalStorage arrays instantly
-      try {
-        const raw = window.localStorage.getItem('playhub_admin_videos');
-        const list = raw ? JSON.parse(raw) : [];
-        list.unshift(cleanVideoPayload);
-        window.localStorage.setItem('playhub_admin_videos', JSON.stringify(list));
-        window.localStorage.setItem('playhub_home_feed_videos', JSON.stringify(list));
-      } catch (err) {
-        console.error('LocalStorage write failure', err);
-      }
-
-      // Target B: Sync payload parameters to Node.js api express database server
+      // STEP 1: Push straight to the permanent server database first
       const response = await fetch(`${BACKEND_API_URL}/videos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cleanVideoPayload)
       });
 
+      // STEP 2: Sync layout to localStorage cache streams if database accepts it
       if (response.ok) {
+        const raw = window.localStorage.getItem('playhub_admin_videos');
+        const list = raw ? JSON.parse(raw) : [];
+        list.unshift(cleanVideoPayload);
+        window.localStorage.setItem('playhub_admin_videos', JSON.stringify(list));
+        window.localStorage.setItem('playhub_home_feed_videos', JSON.stringify(list));
+        
         resetUploadForm();
         await fetchUploadedVideos();
-        alert('🚀 Video Node broadcasted to feed matrix successfully!');
+        alert('🚀 Successfully published! Visible to all users globally now.');
         return;
       }
     } catch (err) {
       console.error('Pipeline synchronization dropped reject:', err.message);
-      setUploadError(`Storage rejection error: ${err.message}. Ensure your bucket policy allows the video format.`);
+      setUploadError(`Storage Pipeline Error: ${err.message}. Check storage configurations.`);
     } finally {
       setIsPublishing(false);
     }
   };
+
+  
 
   const resetUploadForm = () => {
     setTitle(''); setChannel(''); setLength(''); setPrice('0'); setDesc(''); setVideoUrl('');
@@ -368,17 +374,34 @@ export default function AdminDashboard() {
               {videos.length === 0 ? (
                 <div className="border border-[#303030] rounded-xl p-5 text-center text-xs text-[#aaaaaa] bg-[#181818]">No rows published yet.</div>
               ) : (
-                videos.map((v, idx) => (
-                  <div key={v.id || idx} className="flex items-center gap-3 border border-[#303030] bg-[#181818] p-2.5 rounded-xl transition hover:border-white/20">
-                    <div className="h-12 w-20 bg-cover bg-center rounded-lg border border-[#303030] shrink-0" style={{ backgroundImage: v.thumb && v.thumb.startsWith('linear') ? 'none' : `url(${v.thumb})`, background: v.thumb && v.thumb.startsWith('linear') ? v.thumb : undefined }} />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-medium text-white truncate">{v.title}</h4>
-                      <p className="text-xs text-[#aaaaaa] truncate mt-0.5">{v.channel} &middot; {v.length} &middot; {parseInt(v.price) > 0 ? `TSh ${parseInt(v.price).toLocaleString()}` : 'Free'}</p>
-                    </div>
-                    <button onClick={() => handleDeleteVideo(v.id)} className="text-sm text-[#aaaaaa] p-2 hover:text-[#ff5f5f] rounded-lg hover:bg-[#212121] transition cursor-pointer">🗑</button>
-                  </div>
-                ))
-              )}
+videos.map((v, idx) => (
+  <div key={v.id || idx} className="flex items-center gap-3 border border-[#303030] bg-[#181818] p-2.5 rounded-xl transition hover:border-white/20">
+    {/* FIXED RENDER ENGINE: Replaced CSS backgroundImage with explicit HTML img element */}
+    <div className="h-12 w-20 rounded-lg border border-[#303030] bg-[#1c1c1c] overflow-hidden shrink-0 relative flex items-center justify-center">
+      <img
+        src={v.thumb && !v.thumb.startsWith('linear') ? v.thumb : "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%231a1a1a'/></svg>"}
+        alt={v.title || "Thumbnail"}
+        className="w-full h-full object-cover"
+        style={{
+          background: v.thumb && v.thumb.startsWith('linear') ? v.thumb : undefined
+        }}
+        onError={(e) => {
+          // Fail-safe local canvas placeholder fallback if the database row string is malformed
+          e.target.src = "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%23222'/></svg>";
+        }}
+      />
+    </div>
+    
+    <div className="flex-1 min-w-0">
+      <h4 className="text-sm font-medium text-white truncate">{v.title}</h4>
+      <p className="text-xs text-[#aaaaaa] truncate mt-0.5">{v.channel} &middot; {v.length} &middot; {parseInt(v.price) > 0 ? `TSh ${parseInt(v.price).toLocaleString()}` : 'Free'}</p>
+    </div>
+    <button onClick={() => handleDeleteVideo(v.id)} className="text-sm text-[#aaaaaa] p-2 hover:text-[#ff5f5f] rounded-lg hover:bg-[#212121] transition cursor-pointer">🗑</button>
+  </div>
+))
+
+              )
+              }
             </div>
           </div>
         </div>
