@@ -46,11 +46,16 @@ export default function PlayHubHome() {
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [currentTransactionId, setCurrentTransactionId] = useState(null);
 
+  // ⚡ PREMIUM INDIVIDUAL VIDEO VERIFICATION & POLLING STATES
+  const [isCheckingPpv, setIsCheckingPpv] = useState(false);
+  const [currentPpvTxId, setCurrentPpvTxId] = useState(null);
+  const [ppvStatusText, setPpvStatusText] = useState('Pay to Unlock Video');
+
   // Video Lightbox Context States
   const [activeVideo, setActiveVideo] = useState(null);
   const [isPpvLocked, setIsPpvLocked] = useState(false);
 
-  const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api';
+  const BACKEND_API_URL = '/api';
   const operatorNames = { mpesa: 'M-Pesa', tigopesa: 'Tigo Pesa', airtel: 'Airtel Money', halopesa: 'HaloPesa' };
 
     // DUAL LOOKUP FETCH ROUTINE: Combines remote database with local storage streams flawlessly
@@ -94,60 +99,6 @@ export default function PlayHubHome() {
     setLoading(false);
   };
 
-    useEffect(() => {
-    const entranceToken = window.localStorage.getItem('playhub_paid');
-    if (entranceToken === '1') {
-      setIsSiteLocked(false);
-    }
-    fetchCloudVideos();
-  }, [BACKEND_API_URL]);
-
-  useEffect(() => {
-    if (isCheckingPayment) return; 
-    if (paymentMethod === 'momo') {
-      setPayStatusText(`Pay with ${operatorNames[selectedOp]}`);
-    } else {
-      setPayStatusText('Pay TSh 20,000 with card');
-    }
-    setPayError('');
-  }, [paymentMethod, selectedOp, isCheckingPayment]);
-
-  // 🔄 REAL-TIME STATUS POLLING LOOP: Fires every 3 seconds until verified
-  useEffect(() => {
-    if (!isCheckingPayment || !currentTransactionId) return;
-
-    const intervalId = setInterval(async () => {
-      try {
-        const res = await fetch(`${BACKEND_API_URL}/payments/verify?transactionId=${currentTransactionId}`);
-        
-        if (res.ok) {
-          const data = await res.json();
-          
-          if (data.status === 'SUCCESS') {
-            setPayStatusText('🎉 Payment Verified! Welcome.');
-            clearInterval(intervalId);
-            
-            window.localStorage.setItem('playhub_paid', '1');
-            
-            setTimeout(() => {
-              setIsSiteLocked(false);
-              setIsCheckingPayment(false);
-              setCurrentTransactionId(null);
-            }, 1500);
-          } else if (data.status === 'FAILED') {
-            setPayError(data.message || 'Transaction was canceled or declined.');
-            setIsCheckingPayment(false);
-            clearInterval(intervalId);
-          }
-        }
-      } catch (err) {
-        console.warn('Waiting for payment confirmation sync hook...');
-      }
-    }, 3000);
-
-    return () => clearInterval(intervalId);
-  }, [isCheckingPayment, currentTransactionId, BACKEND_API_URL, paymentMethod, selectedOp]);
-
     const handleOperatorSwitch = (e, networkKey) => {
     e.preventDefault(); e.stopPropagation();
     if (isCheckingPayment) return;
@@ -188,6 +139,7 @@ export default function PlayHubHome() {
     setActiveVideo(video);
     if (!isFree && !isVideoPurchased) {
       setIsPpvLocked(true);
+      setPpvStatusText(`Pay TSh ${cleanPrice.toLocaleString()} to Unlock`);
     } else {
       setIsPpvLocked(false);
     }
@@ -232,10 +184,7 @@ export default function PlayHubHome() {
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Gateway connection timeout.');
-      }
+      if (!response.ok) throw new Error(data.message || 'Gateway connection timeout.');
 
       setCurrentTransactionId(data.transactionId);
       setPayStatusText('Enter PIN prompt on your phone...');
@@ -251,15 +200,36 @@ export default function PlayHubHome() {
     if (!isCheckingPayment) handleSiteGateSubmit(null); 
   };
 
-  const handleProcessLocalPPV = async (videoId) => {
-    const ppvStorageKey = `playhub_ppv_paid_${videoId}`;
+  // Asynchronous Payment Handler for Premium Video Items
+  const handleProcessLocalPPV = async (video) => {
+    if (isCheckingPpv) return;
+    setIsCheckingPpv(true);
+    setPpvStatusText('Initiating Push Request...');
+
     try {
-      window.localStorage.setItem(ppvStorageKey, '1');
-      alert('🎉 Payment Success! Video asset has been unlocked permanently.');
-      setIsPpvLocked(false);
-      await fetchCloudVideos(); 
+      const response = await fetch(`${BACKEND_API_URL}/payments/initiate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          method: 'momo',
+          phone: `255${momoPhone || '740000000'}`, 
+          operator: selectedOp,
+          amount: parseInt(video.price),
+          currency: 'TZS',
+          videoId: video.id
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Gateway communication failure.');
+
+      setCurrentPpvTxId(data.transactionId);
+      setPpvStatusText('Enter PIN on phone...');
+      
     } catch (err) {
-      alert('Storage cache writing failure.');
+      alert(err.message || 'Video access payment request failed.');
+      setPpvStatusText(`Pay TSh ${parseInt(video.price).toLocaleString()} to Unlock`);
+      setIsCheckingPpv(false);
     }
   };
 
@@ -330,6 +300,7 @@ export default function PlayHubHome() {
         </div>
       </nav>
 
+
       {/* CORE INTERFACE WORKSPACE MAIN BODY CONTAINER */}
       <main className="p-6 max-w-7xl mx-auto space-y-6">
         
@@ -349,7 +320,6 @@ export default function PlayHubHome() {
           ))}
         </div>
 
-
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {[1, 2, 3, 4].map((i) => (
@@ -364,7 +334,7 @@ export default function PlayHubHome() {
           <div className="text-center py-20 border border-dashed border-[#27272a] rounded-3xl bg-[#141417]/30">
             <Film className="h-10 w-10 text-neutral-600 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-neutral-300">No media streams found</h3>
-            <p className="text-xs text-neutral-500 mt-1 max-w-xs mx-auto">Try re-adjusting your filter constraints or upload a sample video inside your admin panel.</p>
+            <p className="text-xs text-neutral-500 mt-1 max-w-xs mx-auto">Try re-adjusting your filter constraints.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -422,7 +392,6 @@ export default function PlayHubHome() {
         )}
       </main>
 
-
       {/* VIDEO LIGHTBOX PLAYER MODAL LAYER OVERLAY CONTAINER */}
       {activeVideo && (
         <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn">
@@ -433,7 +402,7 @@ export default function PlayHubHome() {
                 <span className="text-[10px] bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20 font-bold px-2 py-0.5 rounded uppercase tracking-wider">Theater View</span>
                 <h2 className="text-sm font-bold text-white truncate mt-1 tracking-tight">{activeVideo.title}</h2>
               </div>
-              <button onClick={() => { setActiveVideo(null); setIsPpvLocked(false); }} className="h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer">
+              <button onClick={() => { setActiveVideo(null); setIsPpvLocked(false); setIsCheckingPpv(false); setCurrentPpvTxId(null); }} className="h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer">
                 <X size={16} />
               </button>
             </div>
@@ -441,22 +410,30 @@ export default function PlayHubHome() {
             <div className="flex-1 bg-black relative flex items-center justify-center aspect-video min-h-[300px]">
               {isPpvLocked ? (
                 <div className="absolute inset-0 bg-[#0e0e11]/90 backdrop-blur-md p-6 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto z-10">
-                  <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center animate-bounce">
-                    <Lock size={20} />
+                  <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <Lock size={20} className={isCheckingPpv ? "animate-pulse" : ""} />
                   </div>
                   <div>
                     <h3 className="text-base font-black text-white tracking-tight">Pay-Per-View Locked Asset</h3>
-                    <p className="text-xs text-neutral-400 mt-1.5 leading-normal">This specific video item requires an individual standalone micro-payment access clear token to unlock viewing credentials.</p>
+                    <p className="text-xs text-neutral-400 mt-1.5 leading-normal">This specific video item requires an individual standalone micro-payment access token to unlock viewing credentials.</p>
                   </div>
                   <div className="bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-center w-full">
                     <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">Video Pricing Fee</span>
                     <p className="text-xl font-black text-amber-400 mt-0.5">TSh {parseInt(activeVideo.price).toLocaleString()}</p>
                   </div>
                   <button 
-                    onClick={() => handleProcessLocalPPV(activeVideo.id)}
-                    className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black font-extrabold py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-500/10 cursor-pointer"
+                    disabled={isCheckingPpv}
+                    onClick={() => handleProcessLocalPPV(activeVideo)}
+                    className={`w-full font-extrabold py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer
+                      ${isCheckingPpv
+                        ? 'bg-neutral-800 text-neutral-500 border border-white/5 shadow-none animate-pulse cursor-not-allowed'
+                        : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black shadow-amber-500/10 active:scale-[0.99]'
+                      }`}
                   >
-                    Simulate PPV Pay Clearance Pass
+                    {isCheckingPpv && (
+                      <RefreshCw size={12} className="animate-spin text-amber-500" />
+                    )}
+                    {isCheckingPpv ? ppvStatusText : `Pay TSh ${parseInt(activeVideo.price).toLocaleString()} to Unlock`}
                   </button>
                 </div>
               ) : (
@@ -477,15 +454,12 @@ export default function PlayHubHome() {
       {isSiteLocked && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-hidden group/bg">
           
-          {/* 🖼️ LOCAL FILE 11.JPG WITH HIGH-END AMBIENT INTEGRATED SPOTLIGHT HOVER REVEAL */}
           <div className="absolute inset-0 w-full h-full z-0 overflow-hidden pointer-events-none select-none">
             <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-black/50 to-[#09090b] z-20" />
-            
             <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-all duration-500 z-10 
               group-hover/bg:bg-black/10 
               [background:radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.65)_60%)]" 
             />
-            
             <img
               src="/11.jpg"
               alt="Cinematic Background Backdrop"
@@ -498,8 +472,6 @@ export default function PlayHubHome() {
             />
           </div>
 
-
-          {/* GLASSMORPHIC PORTAL CONTROL WORKSPACE PLATFORM CARD */}
           <div className="w-full max-w-[400px] bg-[#141414]/75 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 shadow-2xl shadow-black/90 space-y-5 z-20 border-t-white/15">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -579,3 +551,4 @@ export default function PlayHubHome() {
     </div>
   );
 }
+
