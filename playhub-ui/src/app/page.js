@@ -114,7 +114,7 @@ export default function PlayHubHome() {
     setCardExp(v);
   };
 
-  const handleVerifyVideoAccess = (video) => {
+    const handleVerifyVideoAccess = (video) => {
     if (isSiteLocked) return; 
     const ppvStorageKey = `playhub_ppv_paid_${video.id}`;
     const isVideoPurchased = window.localStorage.getItem(ppvStorageKey) === '1';
@@ -136,7 +136,7 @@ export default function PlayHubHome() {
     if (paymentMethod === 'momo') {
       const cleanPhone = momoPhone.replace(/\D/g, '');
       
-      // CRITICAL FIX: Clean length-check bypass. Allows ANY number as long as it has exactly 9 digits!
+      // LENIENT LENGTH CONTROLLER: Grants access seamlessly as long as exactly 9 digits are supplied!
       if (cleanPhone.length !== 9) {
         setPayError('Enter a valid 9-digit Tanzanian mobile number (e.g., 740 462 193).');
         return;
@@ -188,15 +188,18 @@ export default function PlayHubHome() {
     return `${Math.round(hrs / 24)}d ago`;
   };
 
+  // MULTICRITERIA FILTER EXECUTOR: Searches titles, chips, channels, and pricing matrices
   const filteredVideos = videos.filter((v) => {
     const textQuery = searchQuery.toLowerCase();
     const chipQuery = activeChip.toLowerCase();
     
+    // Filter layer A: Header Text Query input
     const matchesSearch = !searchQuery || (
       v.title?.toLowerCase().includes(textQuery) ||
       v.channel?.toLowerCase().includes(textQuery)
     );
 
+    // Filter layer B: Categorization Quick Chip
     let matchesChip = true;
     if (activeChip === 'Premium') {
       matchesChip = parseInt(v.price) > 0;
@@ -211,7 +214,6 @@ export default function PlayHubHome() {
 
     return matchesSearch && matchesChip;
   });
-
 
     return (
     <div className={`min-h-screen bg-[#0f0f0f] text-[#f1f1f1] font-sans antialiased ${isSiteLocked ? 'overflow-hidden max-h-screen' : ''}`}>
@@ -269,6 +271,8 @@ export default function PlayHubHome() {
 
         {/* MAIN BODY FEED MATRIX OVERLAY */}
         <main className="flex-1 min-w-0 px-4 py-5 overflow-y-auto h-[calc(100vh-57px)]">
+          
+          {/* HORIZONTAL CATEGORIZATION QUICK CHIPS ROW */}
           <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar tracking-wide shrink-0">
             {['All', 'Action', 'Drama', 'Series', 'Dubbed', 'Premium', 'Free'].map((chip) => (
               <button
@@ -290,7 +294,7 @@ export default function PlayHubHome() {
             <div className="border border-[#303030] bg-[#181818] rounded-xl p-12 text-center max-w-sm mx-auto mt-12 shadow-xl">
               <span className="text-3xl block mb-2">🎬</span>
               <h4 className="text-sm font-bold text-white">No active broadcasts</h4>
-              <p className="text-xs text-[#aaaaaa] mt-1">No channels or links published match the active matrix selection.</p>
+              <p className="text-xs text-[#aaaaaa] mt-1">No channels match the active matrix selection.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-8 mt-2">
