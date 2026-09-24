@@ -2,6 +2,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { 
+  UploadCloud, 
+  ShieldAlert, 
+  DollarSign, 
+  Tv, 
+  Clock, 
+  Coins, 
+  Trash2, 
+  Link, 
+  Image as ImageIcon, 
+  ArrowLeft, 
+  FileVideo, 
+  Activity,
+  Layers
+} from 'lucide-react';
 
 // Terabyte Infrastructure Connection Credentials
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://supabase.co';
@@ -24,7 +39,7 @@ export default function AdminDashboard() {
   const [desc, setDesc] = useState('');
   
   // Media Provider Routines
-  const [videoProvider, setVideoProvider] = useState('local_file'); // Default to high-capacity local upload
+  const [videoProvider, setVideoProvider] = useState('local_file'); 
   const [videoUrl, setVideoUrl] = useState('');
   const [totalSimulatedRevenue, setTotalSimulatedRevenue] = useState(0);
 
@@ -32,7 +47,7 @@ export default function AdminDashboard() {
   const [pendingThumb, setPendingThumb] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
-  const [videoFileName, setVideoStatusName] = useState('🎬 Drag & Drop or Click to choose heavy video file');
+  const [videoFileName, setVideoStatusName] = useState('Select high-capacity film asset from disk');
   const [rawFileObject, setRawFileObject] = useState(null);
   
   // TERABYTE TRACKING STATES: Real-Time Speed & Capacity Metrics
@@ -95,11 +110,11 @@ export default function AdminDashboard() {
 
     setRawFileObject(file);
     const sizeInGB = (file.size / (1024 * 1024 * 1024)).toFixed(2);
-    setVideoStatusName(`📦 Ready for Terabyte Storage Pipeline: ${file.name} (${sizeInGB} GB)`);
+    setVideoStatusName(`${file.name} (${sizeInGB} GB)`);
     setVideoProvider('local_file');
   };
 
-  // SMART LINK TRANSLATOR: Normalizes raw text codes into valid player components
+    // SMART LINK TRANSLATOR: Normalizes raw text codes into valid player components
   const compileVideoDescription = (overrideUrl) => {
     if (videoProvider === 'local_file') return overrideUrl || '';
     const linkInput = videoUrl.trim();
@@ -150,13 +165,11 @@ export default function AdminDashboard() {
       return;
     }
 
-    // FIXED VERIFICATION CONDITIONAL: Demands a URL string ONLY if an external link provider is picked!
     if (videoProvider !== 'local_file' && !videoUrl.trim()) {
       setUploadError('Please provide an external streaming URL reference link or embed code.');
       return;
     }
 
-    // FIXED FILE VALIDATION: Ensures a file was attached if local file mode is selected
     if (videoProvider === 'local_file' && !rawFileObject) {
       setUploadError('Please select a local video file from your computer to upload.');
       return;
@@ -214,14 +227,12 @@ export default function AdminDashboard() {
         uploadedAt: new Date().toISOString()
       };
 
-      // STEP 1: Push straight to the permanent server database first
       const response = await fetch(`${BACKEND_API_URL}/videos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cleanVideoPayload)
       });
 
-      // STEP 2: Sync layout to localStorage cache streams if database accepts it
       if (response.ok) {
         const raw = window.localStorage.getItem('playhub_admin_videos');
         const list = raw ? JSON.parse(raw) : [];
@@ -231,23 +242,20 @@ export default function AdminDashboard() {
         
         resetUploadForm();
         await fetchUploadedVideos();
-        alert('🚀 Successfully published! Visible to all users globally now.');
         return;
       }
     } catch (err) {
       console.error('Pipeline synchronization dropped reject:', err.message);
-      setUploadError(`Storage Pipeline Error: ${err.message}. Check storage configurations.`);
+      setUploadError(`Storage Pipeline Error: ${err.message}.`);
     } finally {
       setIsPublishing(false);
     }
   };
 
-  
-
   const resetUploadForm = () => {
     setTitle(''); setChannel(''); setLength(''); setPrice('0'); setDesc(''); setVideoUrl('');
     setPendingThumb(''); setRawFileObject(null); setUploadProgress(0); setUploadSpeed('');
-    setVideoStatusName('🎬 Drag & Drop or Click to choose heavy video file');
+    setVideoStatusName('Select high-capacity film asset from disk');
     setIsPublishing(false);
   };
 
@@ -269,17 +277,24 @@ export default function AdminDashboard() {
 
     if (!isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0f0f0f] text-[#f1f1f1] px-4 font-sans">
-        <div className="w-full max-w-[360px] rounded-2xl border border-[#303030] bg-[#181818] p-6 shadow-2xl">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="relative h-[18px] w-[26px] rounded bg-[#ff3b3b] shrink-0 after:absolute after:left-[9.5px] after:top-[4px] after:border-y-[5px] after:border-l-[8px] after:border-y-transparent after:border-l-white" />
-            <span className="font-semibold text-base">PlayHub Portal Gate</span>
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0f0d] text-[#e2e8f0] px-4 font-sans antialiased">
+        <div className="w-full max-w-[380px] rounded-3xl border border-[#222c26] bg-[#111613] p-7 shadow-2xl space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-[#ff3b3b]/10 border border-[#ff3b3b]/20 flex items-center justify-center text-[#ff3b3b]">
+              <ShieldAlert size={18} />
+            </div>
+            <div>
+              <h2 className="text-md font-bold text-white tracking-tight">PlayHub Console Deck</h2>
+              <p className="text-[11px] text-[#888] font-medium mt-0.5">Administrative Auth Verification</p>
+            </div>
           </div>
-          <h2 className="text-lg font-bold mb-4">Verification Check</h2>
           <form onSubmit={(e) => { e.preventDefault(); if (passcode === 'playhub2026') { window.sessionStorage.setItem('playhub_admin_auth', 'verified'); setIsAuthenticated(true); } else { setAuthError('Incorrect system authorization passcode.'); } }} className="space-y-4">
-            <input type="password" placeholder="Enter admin key" value={passcode} onChange={(e) => setPasscode(e.target.value)} className="w-full bg-[#212121] border border-[#303030] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#ff5f5f]" />
-            {authError && <p className="text-[#ff5f5f] text-xs font-medium">{authError}</p>}
-            <button type="submit" className="w-full bg-[#ff3b3b] text-white font-semibold py-2.5 rounded-lg text-sm transition hover:bg-[#ff5f5f] cursor-pointer">Verify Credentials</button>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] uppercase font-bold tracking-widest text-[#666]">Security Token</label>
+              <input type="password" placeholder="••••••••" value={passcode} onChange={(e) => setPasscode(e.target.value)} className="w-full bg-[#161d19] border border-[#26332d] rounded-xl px-4 py-3 text-sm text-white font-mono outline-none focus:border-[#ff3b3b] transition-all" />
+            </div>
+            {authError && <p className="text-[#ff5f5f] text-xs font-semibold tracking-tight">{authError}</p>}
+            <button type="submit" className="w-full bg-gradient-to-r from-[#ff3b3b] to-[#ff5f5f] text-white font-extrabold py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-[#ff3b3b]/10 hover:shadow-[#ff3b3b]/20 cursor-pointer transform active:scale-[0.99] transition-all">Verify Credentials</button>
           </form>
         </div>
       </div>
@@ -287,121 +302,165 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] text-[#f1f1f1] font-sans antialiased">
-      <nav className="sticky top-0 z-40 flex items-center justify-between border-b border-[#303030] bg-[#0f0f0f] px-4 py-3">
-        <div className="flex items-center gap-2 shrink-0">
+    <div className="min-h-screen bg-[#070908] text-[#e2e8f0] font-sans antialiased selection:bg-[#ff3b3b]/20">
+      {/* CONTROL ROOM TOP BANNER HEADER */}
+      <nav className="sticky top-0 z-40 flex items-center justify-between border-b border-[#1c2420] bg-[#070908]/90 backdrop-blur-md px-6 py-3.5">
+        <div className="flex items-center gap-2.5 shrink-0">
           <div className="relative h-[21px] w-[30px] rounded-md bg-[#ff3b3b] after:absolute after:left-[11px] after:top-[5px] after:border-y-[5.5px] after:border-l-[9px] after:border-y-transparent after:border-l-white" />
-          <span className="text-lg font-semibold tracking-tight">PlayHub</span>
-          <span className="ml-2 bg-[#ff3b3b]/10 text-[#ff3b3b] border border-[#ff3b3b]/20 px-2 py-0.5 rounded text-xs font-medium">Admin</span>
+          <span className="text-lg font-black tracking-tight text-white uppercase">PlayHub</span>
+          <span className="bg-[#ff3b3b]/10 text-[#ff3b3b] border border-[#ff3b3b]/20 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider">Control Panel</span>
         </div>
-        <a href="/" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#212121] border border-[#303030] hover:bg-[#303030] text-sm text-[#f1f1f1] no-underline">←</a>
+        <a href="/" className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#141c18] border border-[#222c26] text-[#aaa] hover:text-white hover:border-[#ff3b3b] transition-all duration-200">
+          <ArrowLeft size={16} />
+        </a>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-4 py-8 grid gap-8 md:grid-cols-2">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-white">Publish Streaming Link</h1>
-          <p className="text-xs text-[#aaaaaa] mt-1 mb-6">Distribute files directly to storage buckets or stream via external providers cleanly.</p>
+      <div className="max-w-7xl mx-auto px-6 py-8 grid gap-8 lg:grid-cols-12 items-start">
+        {/* INPUT SUBMISSION WORKSPACE WRAPPER */}
+        <div className="lg:col-span-5 space-y-6">
+          <div>
+            <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
+              <UploadCloud size={20} className="text-[#ff3b3b]" /> Broadcast Studio
+            </h1>
+            <p className="text-xs text-[#888] mt-1">Distribute high-definition file streams straight to public matrix targets.</p>
+          </div>
 
-          <form onSubmit={handlePublishSubmit} className="bg-[#181818] border border-[#303030] rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-[#aaaaaa] font-medium">Video Title</label>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Swahili Action Movie" className="w-full bg-[#212121] border border-[#303030] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#ff5f5f]" required />
+          <form onSubmit={handlePublishSubmit} className="bg-[#0e1411] border border-[#1c2420] rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#aaa] font-bold tracking-tight">Video Broadcast Title</label>
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Swahili Dubbed Action Film" className="w-full bg-[#141d19] border border-[#222c26] rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#ff3b3b] focus:bg-[#101714] transition-all" required />
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div><label className="text-xs text-[#aaaaaa] font-medium">Channel Name</label><input type="text" value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="Studio Brand" className="w-full bg-[#212121] border border-[#303030] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#ff5f5f]" required /></div>
-              <div><label className="text-xs text-[#aaaaaa] font-medium">Length</label><input type="text" value={length} onChange={(e) => setLength(e.target.value)} placeholder="e.g. 1h 45m" className="w-full bg-[#212121] border border-[#303030] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#ff5f5f]" required /></div>
-              <div><label className="text-xs text-[#aaaaaa] font-medium">PPV Price (TSh)</label><input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full bg-[#212121] border border-[#303030] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#ff5f5f]" required /></div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs text-[#aaa] font-bold tracking-tight">Studio Brand</label>
+                <input type="text" value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="Channel Name" className="w-full bg-[#141d19] border border-[#222c26] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#ff3b3b] transition-all" required />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-[#aaa] font-bold tracking-tight">Duration</label>
+                <input type="text" value={length} onChange={(e) => setLength(e.target.value)} placeholder="e.g. 2h 15m" className="w-full bg-[#141d19] border border-[#222c26] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#ff3b3b] transition-all" required />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-[#aaa] font-bold tracking-tight">Price (TSh)</label>
+                <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full bg-[#141d19] border border-[#222c26] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#ff3b3b] transition-all" required />
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs text-[#aaaaaa] font-medium">Link Host Provider</label>
-                <select value={videoProvider} onChange={(e) => setVideoProvider(e.target.value)} className="w-full bg-[#212121] border border-[#303030] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#ff5f5f]">
-                  <option value="local_file">Infinite Local Video File (.MP4/.MOV)</option>
-                  <option value="mp4">Direct URL / YouTube Embed</option>
-                  <option value="vimeo">Vimeo Video ID</option>
-                  <option value="bunny">Bunny.net Stream Address</option>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs text-[#aaa] font-bold tracking-tight">Host Pipeline</label>
+                <select value={videoProvider} onChange={(e) => setVideoProvider(e.target.value)} className="w-full bg-[#141d19] border border-[#222c26] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#ff3b3b] cursor-pointer transition-all">
+                  <option value="local_file">Direct Local Film Asset</option>
+                  <option value="mp4">YouTube Link / URL</option>
+                  <option value="vimeo">Vimeo Frame Reference</option>
+                  <option value="bunny">Bunny Stream Core</option>
                 </select>
               </div>
-              <div>
-                <label className="text-xs text-[#aaaaaa] font-medium">Source link / Reference ID</label>
-                <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder={videoProvider === 'local_file' ? 'Locked (Use local upload field below)' : 'Paste URL or embed key'} disabled={videoProvider === 'local_file'} className="w-full bg-[#212121] border border-[#303030] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#ff5f5f]" />
+              <div className="space-y-1.5">
+                <label className="text-xs text-[#aaa] font-bold tracking-tight">Source Key Token</label>
+                <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder={videoProvider === 'local_file' ? 'Locked (Use picker field)' : 'Paste frame or link address'} disabled={videoProvider === 'local_file'} className="w-full bg-[#141d19] border border-[#222c26] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#ff3b3b] disabled:opacity-30 transition-all" />
               </div>
             </div>
 
             {videoProvider === 'local_file' && (
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-[#aaaaaa] font-medium">Heavy Video Upload Asset</label>
-                <div className="relative border border-[#303030] border-dashed hover:border-[#ff3b3b] bg-[#212121] rounded-xl p-4 text-center cursor-pointer transition">
+              <div className="space-y-1.5 animate-fadeIn">
+                <label className="text-xs text-[#aaa] font-bold tracking-tight">Heavy Video Source Asset</label>
+                <div className="relative border border-[#222c26] border-dashed hover:border-[#ff3b3b] bg-[#141d19] rounded-xl p-4 text-center cursor-pointer transition-all duration-200">
                   <input type="file" accept="video/*" onChange={handleVideoFileChange} className="absolute inset-0 opacity-0 cursor-pointer z-20" />
-                  <span className="text-xs text-[#aaaaaa] block truncate">{videoFileName}</span>
+                  <div className="flex flex-col items-center gap-1.5 py-1">
+                    <FileVideo size={18} className="text-[#555]" />
+                    <span className="text-[11px] text-[#888] font-semibold truncate max-w-xs">{videoFileName}</span>
+                  </div>
                 </div>
               </div>
             )}
 
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-[#aaaaaa] font-medium">Cover Thumbnail Canvas</label>
-              <div className="group relative border border-[#303030] border-dashed hover:border-[#ff3b3b] bg-[#212121] rounded-xl overflow-hidden aspect-video cursor-pointer flex items-center justify-center transition" style={{ backgroundImage: pendingThumb ? `url(${pendingThumb})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#aaa] font-bold tracking-tight">Cover Thumbnail Artwork</label>
+              <div className="group relative border border-[#222c26] border-dashed hover:border-[#ff3b3b] bg-[#141d19] rounded-xl overflow-hidden aspect-video cursor-pointer flex items-center justify-center transition-all duration-200" style={{ backgroundImage: pendingThumb ? `url(${pendingThumb})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
                 <input type="file" accept="image/*" onChange={handleThumbnailChange} className="absolute inset-0 opacity-0 cursor-pointer z-20" />
-                {!pendingThumb && <span className="text-xs text-[#aaaaaa] pointer-events-none">📷 Select Cover Thumbnail picture</span>}
+                {!pendingThumb && (
+                  <div className="flex flex-col items-center gap-1.5 text-[#888]">
+                    <ImageIcon size={18} className="text-[#555]" />
+                    <span className="text-[11px] font-semibold">Attach grid layout picture</span>
+                  </div>
+                )}
               </div>
             </div>
 
             {uploadProgress > 0 && (
-              <div className="bg-[#212121] border border-[#303030] p-3 rounded-xl space-y-1.5">
-                <div className="flex justify-between text-xs font-medium"><span className="text-[#aaaaaa]">Streaming pipeline track...</span><span className="text-white">{uploadSpeed} ({Math.round(uploadProgress)}%)</span></div>
-                <div className="w-full bg-[#303030] h-1.5 rounded-full overflow-hidden"><div className="bg-[#ff3b3b] h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} /></div>
+              <div className="bg-[#141d19] border border-[#222c26] p-3.5 rounded-xl space-y-2 animate-fadeIn">
+                <div className="flex justify-between text-[11px] font-bold tracking-tight">
+                  <span className="text-[#888] flex items-center gap-1"><Activity size={12} className="text-[#ff3b3b]" /> Streaming pipeline...</span>
+                  <span className="text-white font-mono">{uploadSpeed} ({Math.round(uploadProgress)}%)</span>
+                </div>
+                <div className="w-full bg-[#1c2420] h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-gradient-to-r from-[#ff3b3b] to-[#ff5f5f] h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                </div>
               </div>
             )}
 
-            {uploadError && <p className="text-[#ff5f5f] text-xs font-medium">{uploadError}</p>}
-            <button type="submit" disabled={isPublishing} className="w-full bg-[#ff3b3b] text-white font-bold py-3 rounded-xl text-sm transition hover:bg-[#ff5f5f] shadow-lg cursor-pointer">
-              {isPublishing ? 'Publishing everywhere...' : 'Publish to Feed Matrix'}
+            {uploadError && <p className="text-[#ff5f5f] text-xs font-bold bg-[#ff5f5f]/10 p-2.5 rounded-xl border border-[#ff5f5f]/20 tracking-tight animate-shake">{uploadError}</p>}
+            
+            <button type="submit" disabled={isPublishing} className="w-full bg-gradient-to-r from-[#ff3b3b] to-[#ff5f5f] text-white font-extrabold py-3.5 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-[#ff3b3b]/10 hover:shadow-[#ff3b3b]/20 cursor-pointer disabled:opacity-40 disabled:pointer-events-none transition-all duration-300 transform active:scale-[0.99]">
+              {isPublishing ? 'Broadcasting layers...' : 'Publish to Feed Matrix'}
             </button>
           </form>
         </div>
 
-        <div className="space-y-6">
-          <div className="bg-gradient-to-br from-[#181818] to-[#111111] border border-[#303030] rounded-2xl p-5 shadow-lg flex justify-between items-center">
-            <div><p className="text-xs font-semibold text-[#aaaaaa] uppercase tracking-wider">Collective Simulated Value</p><h2 className="text-3xl font-extrabold text-white mt-1.5">TSh {totalSimulatedRevenue.toLocaleString()}</h2></div>
-            <div className="h-12 w-12 rounded-xl bg-[#ff3b3b]/10 border border-[#ff3b3b]/20 flex items-center justify-center text-xl">💰</div>
+        {/* FEED METRICS GRID ROW DISPLAY */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="bg-gradient-to-br from-[#0e1411] to-[#070a08] border border-[#1c2420] rounded-3xl p-5 shadow-2xl flex justify-between items-center relative overflow-hidden">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-[#888] uppercase tracking-widest">Collective Simulated Portfolio</p>
+              <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-1">
+                TSh {totalSimulatedRevenue.toLocaleString()}
+              </h2>
+            </div>
+            <div className="h-12 w-12 rounded-2xl bg-[#ff3b3b]/10 border border-[#ff3b3b]/20 flex items-center justify-center text-[#ff3b3b] shadow-xl">
+              <Coins size={20} />
+            </div>
           </div>
 
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">Active Feed Matrix ({videos.length})</h1>
-            <div className="space-y-2 max-h-[440px] overflow-y-auto pr-1 mt-4 no-scrollbar">
+          <div className="space-y-4">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-[#666] flex items-center gap-2">
+              <Layers size={14} /> Active Feed Matrix ({videos.length})
+            </h2>
+            
+            <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1 no-scrollbar animate-fadeIn">
               {videos.length === 0 ? (
-                <div className="border border-[#303030] rounded-xl p-5 text-center text-xs text-[#aaaaaa] bg-[#181818]">No rows published yet.</div>
+                <div className="border border-[#1c2420] rounded-2xl py-12 text-center text-xs text-[#888] bg-[#0e1411] font-medium shadow-xl">No active channels published yet.</div>
               ) : (
-videos.map((v, idx) => (
-  <div key={v.id || idx} className="flex items-center gap-3 border border-[#303030] bg-[#181818] p-2.5 rounded-xl transition hover:border-white/20">
-    {/* FIXED RENDER ENGINE: Replaced CSS backgroundImage with explicit HTML img element */}
-    <div className="h-12 w-20 rounded-lg border border-[#303030] bg-[#1c1c1c] overflow-hidden shrink-0 relative flex items-center justify-center">
-      <img
-        src={v.thumb && !v.thumb.startsWith('linear') ? v.thumb : "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%231a1a1a'/></svg>"}
-        alt={v.title || "Thumbnail"}
-        className="w-full h-full object-cover"
-        style={{
-          background: v.thumb && v.thumb.startsWith('linear') ? v.thumb : undefined
-        }}
-        onError={(e) => {
-          // Fail-safe local canvas placeholder fallback if the database row string is malformed
-          e.target.src = "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%23222'/></svg>";
-        }}
-      />
-    </div>
-    
-    <div className="flex-1 min-w-0">
-      <h4 className="text-sm font-medium text-white truncate">{v.title}</h4>
-      <p className="text-xs text-[#aaaaaa] truncate mt-0.5">{v.channel} &middot; {v.length} &middot; {parseInt(v.price) > 0 ? `TSh ${parseInt(v.price).toLocaleString()}` : 'Free'}</p>
-    </div>
-    <button onClick={() => handleDeleteVideo(v.id)} className="text-sm text-[#aaaaaa] p-2 hover:text-[#ff5f5f] rounded-lg hover:bg-[#212121] transition cursor-pointer">🗑</button>
-  </div>
-))
-
-              )
-              }
+                videos.map((v, idx) => (
+                  <div key={v.id || idx} className="flex items-center gap-3.5 border border-[#1c2420] bg-[#0e1411] p-3 rounded-2xl transition-all duration-200 hover:border-[#2d3b27] shadow-lg group">
+                    <div className="h-12 w-20 rounded-xl border border-[#1c2420] bg-[#141d19] overflow-hidden shrink-0 relative flex items-center justify-center shadow-md">
+                      <img
+                        src={v.thumb && !v.thumb.startsWith('linear') ? v.thumb : "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%23141d19'/></svg>"}
+                        alt={v.title || "Thumbnail"}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        style={{ background: v.thumb && v.thumb.startsWith('linear') ? v.thumb : undefined }}
+                        onError={(e) => { e.target.src = "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%231c2420'/></svg>"; }}
+                      />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <h4 className="text-xs font-bold text-white tracking-tight truncate leading-tight group-hover:text-[#ff3b3b] transition-colors">{v.title}</h4>
+                      <p className="text-[11px] text-[#888] font-medium flex items-center gap-1.5 truncate">
+                        <span className="flex items-center gap-0.5 text-white/60"><Tv size={10} /> {v.channel}</span>
+                        <span>&middot;</span>
+                        <span className="flex items-center gap-0.5"><Clock size={10} /> {v.length}</span>
+                        <span>&middot;</span>
+                        <span className="font-bold text-[#ff3b3b]">{parseInt(v.price) > 0 ? `TSh ${parseInt(v.price).toLocaleString()}` : 'Free'}</span>
+                      </p>
+                    </div>
+                    
+                    <button onClick={() => handleDeleteVideo(v.id)} className="text-[#555] hover:text-[#ff5f5f] hover:bg-[#ff3b3b]/10 p-2.5 rounded-xl transition-all duration-200 cursor-pointer shrink-0">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
