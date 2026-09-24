@@ -42,6 +42,10 @@ export default function PlayHubHome() {
   const [payError, setPayError] = useState('');
   const [payStatusText, setPayStatusText] = useState('Pay with M-Pesa');
 
+  // ⚡ TRANSACTION VERIFICATION & POLLING STATES
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [currentTransactionId, setCurrentTransactionId] = useState(null);
+
   // Video Lightbox Context States
   const [activeVideo, setActiveVideo] = useState(null);
   const [isPpvLocked, setIsPpvLocked] = useState(false);
@@ -49,7 +53,7 @@ export default function PlayHubHome() {
   const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api';
   const operatorNames = { mpesa: 'M-Pesa', tigopesa: 'Tigo Pesa', airtel: 'Airtel Money', halopesa: 'HaloPesa' };
 
-  // DUAL LOOKUP FETCH ROUTINE: Combines remote database with local storage streams flawlessly
+    // DUAL LOOKUP FETCH ROUTINE: Combines remote database with local storage streams flawlessly
   const fetchCloudVideos = async () => {
     let dbVideos = [];
     let localVideos = [];
@@ -90,7 +94,7 @@ export default function PlayHubHome() {
     setLoading(false);
   };
 
-  useEffect(() => {
+    useEffect(() => {
     const entranceToken = window.localStorage.getItem('playhub_paid');
     if (entranceToken === '1') {
       setIsSiteLocked(false);
@@ -99,21 +103,60 @@ export default function PlayHubHome() {
   }, [BACKEND_API_URL]);
 
   useEffect(() => {
+    if (isCheckingPayment) return; 
     if (paymentMethod === 'momo') {
       setPayStatusText(`Pay with ${operatorNames[selectedOp]}`);
     } else {
       setPayStatusText('Pay TSh 20,000 with card');
     }
     setPayError('');
-  }, [paymentMethod, selectedOp]);
+  }, [paymentMethod, selectedOp, isCheckingPayment]);
 
-  const handleOperatorSwitch = (e, networkKey) => {
+  // 🔄 REAL-TIME STATUS POLLING LOOP: Fires every 3 seconds until verified
+  useEffect(() => {
+    if (!isCheckingPayment || !currentTransactionId) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const res = await fetch(`${BACKEND_API_URL}/payments/verify?transactionId=${currentTransactionId}`);
+        
+        if (res.ok) {
+          const data = await res.json();
+          
+          if (data.status === 'SUCCESS') {
+            setPayStatusText('🎉 Payment Verified! Welcome.');
+            clearInterval(intervalId);
+            
+            window.localStorage.setItem('playhub_paid', '1');
+            
+            setTimeout(() => {
+              setIsSiteLocked(false);
+              setIsCheckingPayment(false);
+              setCurrentTransactionId(null);
+            }, 1500);
+          } else if (data.status === 'FAILED') {
+            setPayError(data.message || 'Transaction was canceled or declined.');
+            setIsCheckingPayment(false);
+            clearInterval(intervalId);
+          }
+        }
+      } catch (err) {
+        console.warn('Waiting for payment confirmation sync hook...');
+      }
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [isCheckingPayment, currentTransactionId, BACKEND_API_URL, paymentMethod, selectedOp]);
+
+    const handleOperatorSwitch = (e, networkKey) => {
     e.preventDefault(); e.stopPropagation();
+    if (isCheckingPayment) return;
     setSelectedOp(networkKey);
   };
 
   const handleMethodTabSwitch = (e, methodKey) => {
     e.preventDefault(); e.stopPropagation();
+    if (isCheckingPayment) return;
     setPaymentMethod(methodKey);
     setPayError('');
   };
@@ -135,7 +178,7 @@ export default function PlayHubHome() {
     setCardExp(v);
   };
 
-    const handleVerifyVideoAccess = (video) => {
+  const handleVerifyVideoAccess = (video) => {
     if (isSiteLocked) return; 
     const ppvStorageKey = `playhub_ppv_paid_${video.id}`;
     const isVideoPurchased = window.localStorage.getItem(ppvStorageKey) === '1';
@@ -150,8 +193,9 @@ export default function PlayHubHome() {
     }
   };
 
-  const handleSiteGateSubmit = (e) => {
+    const handleSiteGateSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isCheckingPayment) return;
     setPayError('');
 
     if (paymentMethod === 'momo') {
@@ -171,17 +215,40 @@ export default function PlayHubHome() {
       if (cleanCardCvc.length < 3) { setPayError('Enter a valid CVC.'); return; }
     }
 
-    setPayStatusText('Processing Sandbox Verification…');
+    setIsCheckingPayment(true);
+    setPayStatusText('Initiating Push Request...');
 
-    setTimeout(() => {
-      window.localStorage.setItem('playhub_paid', '1');
-      setIsSiteLocked(false);
-    }, 1200);
+    try {
+      const response = await fetch(`${BACKEND_API_URL}/payments/initiate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          method: paymentMethod,
+          phone: `255${momoPhone}`,
+          operator: selectedOp,
+          amount: 20000,
+          currency: 'TZS'
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Gateway connection timeout.');
+      }
+
+      setCurrentTransactionId(data.transactionId);
+      setPayStatusText('Enter PIN prompt on your phone...');
+      
+    } catch (err) {
+      setPayError(err.message || 'Payment initiation failed. Please check network.');
+      setIsCheckingPayment(false);
+    }
   };
 
   const handleVsCodeForceClick = (e) => {
     e.preventDefault(); e.stopPropagation();
-    handleSiteGateSubmit(null); 
+    if (!isCheckingPayment) handleSiteGateSubmit(null); 
   };
 
   const handleProcessLocalPPV = async (videoId) => {
@@ -196,7 +263,7 @@ export default function PlayHubHome() {
     }
   };
 
-  const getTimeAgo = (isoString) => {
+    const getTimeAgo = (isoString) => {
     if (!isoString) return 'just now';
     const mins = Math.round((Date.now() - new Date(isoString).getTime()) / 60000);
     if (mins < 1) return 'just now';
@@ -240,185 +307,204 @@ export default function PlayHubHome() {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#ef4444] to-[#b91c1c] text-white shadow-lg shadow-red-900/20">
             <Tv className="h-5 w-5" />
           </div>
-          <span className="text-xl font-black tracking-wider bg-gradient-to-r from-white via-[#e4e4e7] to-[#a1a1aa] bg-clip-text text-transparent">PLAYHUB</span>
+          <span className="text-xl font-black tracking-wider bg-gradient-to-r from-white to-neutral-400 bg-clip-text text-transparent">PLAYHUB</span>
         </div>
-        
-        <div className="flex-1 max-w-[550px] relative">
-          <div className="absolute left-4 top-2.5 text-[#71717a]">
-            <Search className="h-4 w-4" />
-          </div>
+
+        <div className="relative max-w-md w-full hidden md:block">
+          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-neutral-500" />
           <input 
             type="text" 
-            placeholder="Search premium titles, channels, Swahili translations..." 
+            placeholder="Search premium videos, channels..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-full border border-[#27272a] bg-[#141416] px-5 py-2 pl-11 text-sm text-[#f8fafc] placeholder-[#52525b] outline-none focus:border-[#ef4444] focus:ring-1 focus:ring-[#ef4444]/20 transition-all focus:bg-[#09090b]"
+            className="w-full bg-[#18181b] border border-[#27272a] rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-[#ef4444] transition-all"
           />
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <button onClick={fetchCloudVideos} className="flex h-9 w-9 items-center justify-center rounded-full border border-[#27272a] bg-[#141416] text-[#e4e4e7] hover:bg-[#27272a] hover:text-white transition active:scale-95 cursor-pointer">
-            <RefreshCw className="h-4 w-4" />
+        <div className="flex items-center gap-3">
+          <button className="p-2 text-neutral-400 hover:text-white rounded-xl hover:bg-[#18181b] transition-all">
+            <Compass className="h-5 w-5" />
           </button>
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#6366f1] to-[#a855f7] text-xs font-bold shadow-md shadow-indigo-900/20 select-none">
-            JD
-          </div>
+          <div className="h-8 w-px bg-[#27272a]" />
+          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-neutral-700 to-neutral-500 border border-neutral-600 flex items-center justify-center text-xs font-bold text-white select-none">PH</div>
         </div>
       </nav>
 
-      <div className="flex">
-        {/* DESIGNER SIDEBAR NAVIGATION */}
-        <aside className="sticky top-[61px] hidden md:flex h-[calc(100vh-61px)] w-[260px] shrink-0 flex-col justify-between border-r border-[#27272a] bg-[#09090b] p-4">
-          <div className="space-y-6">
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-[#71717a] uppercase tracking-widest px-3 mb-2">Discover</p>
-              <button onClick={() => setActiveChip('All')} className={`flex w-full items-center gap-3.5 rounded-xl px-4 py-2.5 text-sm font-medium transition duration-200 cursor-pointer ${activeChip === 'All' ? 'bg-[#1c1c1e] text-white shadow-inner border border-[#27272a]' : 'text-[#a1a1aa] hover:bg-[#141416] hover:text-white'}`}>
-                <Compass className="h-4 w-4" /> Home Feed
-              </button>
-              <button onClick={() => setActiveChip('Premium')} className={`flex w-full items-center gap-3.5 rounded-xl px-4 py-2.5 text-sm font-medium transition duration-200 cursor-pointer ${activeChip === 'Premium' ? 'bg-[#1c1c1e] text-white shadow-inner border border-[#27272a]' : 'text-[#a1a1aa] hover:bg-[#141416] hover:text-white'}`}>
-                <Sparkles className="h-4 w-4 text-amber-400" /> Premium Dubbed
-              </button>
-              <button onClick={() => setActiveChip('Free')} className={`flex w-full items-center gap-3.5 rounded-xl px-4 py-2.5 text-sm font-medium transition duration-200 cursor-pointer ${activeChip === 'Free' ? 'bg-[#1c1c1e] text-white shadow-inner border border-[#27272a]' : 'text-[#a1a1aa] hover:bg-[#141416] hover:text-white'}`}>
-                <Film className="h-4 w-4" /> Free Streams
-              </button>
-            </div>
-            
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-bold text-[#71717a] uppercase tracking-widest px-3 mb-2">My Subscriptions</p>
-              <div className="flex items-center gap-3 px-4 py-2 hover:bg-[#141416] rounded-xl transition duration-150 cursor-pointer group">
-                <div className="h-6 w-6 rounded-lg bg-gradient-to-tr from-[#6366f1] to-[#a855f7] shrink-0" />
-                <span className="text-xs text-[#e4e4e7] group-hover:text-white font-medium truncate">Swahili Media Studio</span>
-              </div>
-              <div className="flex items-center gap-3 px-4 py-2 hover:bg-[#141416] rounded-xl transition duration-150 cursor-pointer group">
-                <div className="h-6 w-6 rounded-lg bg-gradient-to-tr from-[#f59e0b] to-[#ef4444] shrink-0" />
-                <span className="text-xs text-[#e4e4e7] group-hover:text-white font-medium truncate">Bongo Movies HD</span>
-              </div>
-            </div>
-          </div>
+      {/* CORE INTERFACE WORKSPACE MAIN BODY CONTAINER */}
+      <main className="p-6 max-w-7xl mx-auto space-y-6">
+        
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {['All', 'Premium', 'Free', 'Movies', 'Series', 'Live'].map((chip) => (
+            <button
+              key={chip}
+              onClick={() => setActiveChip(chip)}
+              className={`px-4 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition-all border ${
+                activeChip === chip 
+                  ? 'bg-white text-black border-white shadow-md' 
+                  : 'bg-[#18181b] text-neutral-400 border-[#27272a] hover:text-white hover:bg-[#27272a]'
+              }`}
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
 
-          <div className="pt-4 border-t border-[#27272a]">
-            <a href="/admin" className="flex items-center justify-center gap-2 w-full bg-[#141416] hover:bg-[#1c1c1e] border border-[#27272a] hover:border-[#ef4444] text-[#e4e4e7] hover:text-white text-xs font-semibold py-2.5 rounded-xl no-underline transition-all duration-200 shadow-md">
-              <Sliders className="h-3.5 w-3.5" /> Control Panel
-            </a>
-          </div>
-        </aside>
 
-        {/* MAIN BODY FEED MATRIX OVERLAY */}
-        <main className="flex-1 min-w-0 px-6 py-6 overflow-y-auto h-[calc(100vh-57px)]">
-          
-          {/* HORIZONTAL CATEGORIZATION QUICK CHIPS ROW */}
-          <div className="flex gap-2.5 overflow-x-auto pb-5 no-scrollbar tracking-wide shrink-0">
-            {['All', 'Action', 'Drama', 'Series', 'Dubbed', 'Premium', 'Free'].map((chip) => (
-              <button
-                key={chip}
-                onClick={() => setActiveChip(chip)}
-                className={`shrink-0 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer ${activeChip === chip ? 'bg-gradient-to-r from-[#ff3b3b] to-[#ff5f5f] text-white shadow-lg shadow-[#ff3b3b]/20 scale-[1.02]' : 'bg-[#181818] text-[#aaaaaa] border border-[#262626] hover:text-white hover:bg-[#212121]'}`}
-              >
-                {chip}
-              </button>
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-[#18181b] border border-[#27272a] rounded-2xl h-64 animate-pulse space-y-3 p-4">
+                <div className="bg-[#27272a] h-36 w-full rounded-xl" />
+                <div className="bg-[#27272a] h-4 w-3/4 rounded-md" />
+                <div className="bg-[#27272a] h-3 w-1/2 rounded-md" />
+              </div>
             ))}
           </div>
-
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-32 gap-3">
-              <div className="w-8 h-8 border-2 border-[#ff3b3b] border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs text-[#aaaaaa] tracking-wider animate-pulse">Synchronizing premium feed matrix...</p>
-            </div>
-          ) : filteredVideos.length === 0 ? (
-            <div className="border border-[#262626] bg-[#121212] rounded-2xl p-16 text-center max-w-sm mx-auto mt-16 shadow-2xl animate-fadeIn">
-              <div className="h-14 w-12 mx-auto mb-4 bg-[#ff3b3b]/10 border border-[#ff3b3b]/20 rounded-2xl flex items-center justify-center text-[#ff3b3b]">
-                <Film size={24} />
-              </div>
-              <h4 className="text-sm font-bold text-white tracking-tight">No active broadcasts found</h4>
-              <p className="text-xs text-[#aaaaaa] mt-1.5 leading-relaxed">No premium channels or streaming links match the active layout selections.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8 mt-2">
-              {filteredVideos.map((v, idx) => {
-                const cleanPrice = parseInt(v.price) || 0;
-                const isPremiumItem = cleanPrice > 0;
-                const uniqueKey = v.id || `video-feed-${idx}`;
-                return (
-                  <div
-                    key={uniqueKey}
-                    onClick={() => handleVerifyVideoAccess(v)}
-                    className="group flex flex-col bg-[#141414] border border-[#222222] hover:border-[#333333] rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 shadow-xl hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/40"
-                  >
-                    {/* HTML IMG CONTAINER ENGINE */}
-                    <div className="relative aspect-video w-full bg-[#1a1a1a] overflow-hidden border-b border-[#222222]">
-                      <img
-                        src={v.thumb && !v.thumb.startsWith('linear') ? v.thumb : "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%231a1a1a'/></svg>"}
-                        alt={v.title || "Cover Artwork"}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        style={{
-                          background: v.thumb && v.thumb.startsWith('linear') ? v.thumb : undefined
-                        }}
-                        onError={(e) => {
-                          e.target.src = "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='100' height='100' viewBox='0 0 100 100'><rect width='100%' height='100%' fill='%23222'/></svg>";
-                        }}
-                      />
-                      {isPremiumItem && (
-                        <div className="absolute top-3 left-3 bg-[#ff3b3b] text-white px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-widest shadow-md flex items-center gap-1">
-                          <Lock size={10} /> PPV
-                        </div>
+        ) : filteredVideos.length === 0 ? (
+          <div className="text-center py-20 border border-dashed border-[#27272a] rounded-3xl bg-[#141417]/30">
+            <Film className="h-10 w-10 text-neutral-600 mx-auto mb-3" />
+            <h3 className="text-sm font-bold text-neutral-300">No media streams found</h3>
+            <p className="text-xs text-neutral-500 mt-1 max-w-xs mx-auto">Try re-adjusting your filter constraints or upload a sample video inside your admin panel.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {filteredVideos.map((video) => {
+              const itemPrice = parseInt(video.price);
+              const isPremium = !isNaN(itemPrice) && itemPrice > 0;
+              
+              return (
+                <div 
+                  key={video.id} 
+                  onClick={() => handleVerifyVideoAccess(video)}
+                  className="group bg-[#141417] border border-[#27272a] hover:border-neutral-700 rounded-2xl overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 shadow-lg flex flex-col"
+                >
+                  <div className="relative aspect-video w-full bg-neutral-900 overflow-hidden">
+                    <img 
+                      src={video.thumbnailUrl || 'https://unsplash.com'} 
+                      alt={video.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    
+                    <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                      {isPremium ? (
+                        <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-md backdrop-blur-md uppercase tracking-wider">Premium</span>
+                      ) : (
+                        <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-md backdrop-blur-md uppercase tracking-wider">Free</span>
                       )}
-                      <span className="absolute bottom-3 right-3 bg-black/80 px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-white border border-white/5 backdrop-blur-sm">
-                        {v.length || 'Premium'}
-                      </span>
                     </div>
 
-                    <div className="p-4 flex flex-col flex-1 justify-between gap-3">
-                      <div className="min-w-0">
-                        <h4 className="text-sm font-bold text-white tracking-tight leading-snug truncate group-hover:text-[#ff3b3b] transition-colors duration-200">
-                          {v.title}
-                        </h4>
-                        <p className="text-xs text-[#aaaaaa] mt-1 font-medium flex items-center gap-1.5 truncate">
-                          <Tv size={12} className="text-[#666]" /> {v.channel}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between border-t border-[#222222] pt-3 mt-1">
-                        <span className="text-xs font-extrabold tracking-wide text-[#ff3b3b] flex items-center gap-0.5">
-                          {!isPremiumItem && <Compass size={12} className="text-[#ff3b3b]" />}
-                          {isPremiumItem ? `TSh ${cleanPrice.toLocaleString()}` : 'FREE ACCESS'}
-                        </span>
-                        <span className="text-[10px] text-[#777] font-semibold flex items-center gap-1">
-                          <Clock size={10} /> {getTimeAgo(v.uploadedAt)}
-                        </span>
+                    <div className="absolute bottom-2 right-2 bg-black/70 px-1.5 py-0.5 rounded text-[10px] font-bold text-neutral-300 tracking-tight">
+                      {video.duration || '0:00'}
+                    </div>
+
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-300">
+                      <div className="h-11 w-11 rounded-full bg-white/90 text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-all duration-300">
+                        <Play className="h-5 w-5 fill-current ml-0.5" />
                       </div>
                     </div>
                   </div>
-                );
-              })}
+
+                  <div className="p-3.5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-bold text-sm line-clamp-2 text-neutral-100 group-hover:text-white transition-colors tracking-tight leading-tight">{video.title}</h3>
+                      <p className="text-xs text-neutral-400 mt-1 font-medium truncate">{video.channel || 'PlayHub Streamer'}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-[#27272a]/60 text-[11px] text-neutral-500 font-semibold">
+                      <span className="flex items-center gap-1"><Clock size={11} /> {getTimeAgo(video.uploadedAt)}</span>
+                      {isPremium && <span className="text-amber-400 font-extrabold text-xs">TSh {parseInt(video.price).toLocaleString()}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </main>
+
+
+      {/* VIDEO LIGHTBOX PLAYER MODAL LAYER OVERLAY CONTAINER */}
+      {activeVideo && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn">
+          <div className="bg-[#0e0e11] border border-[#27272a] w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
+            
+            <div className="flex items-center justify-between p-4 border-b border-[#27272a] bg-neutral-900/40">
+              <div className="truncate pr-4">
+                <span className="text-[10px] bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20 font-bold px-2 py-0.5 rounded uppercase tracking-wider">Theater View</span>
+                <h2 className="text-sm font-bold text-white truncate mt-1 tracking-tight">{activeVideo.title}</h2>
+              </div>
+              <button onClick={() => { setActiveVideo(null); setIsPpvLocked(false); }} className="h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer">
+                <X size={16} />
+              </button>
             </div>
-          )}
-        </main>
-      </div>
-      {/* GATEWAY ENTRY PAYWALL */}
+
+            <div className="flex-1 bg-black relative flex items-center justify-center aspect-video min-h-[300px]">
+              {isPpvLocked ? (
+                <div className="absolute inset-0 bg-[#0e0e11]/90 backdrop-blur-md p-6 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto z-10">
+                  <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center animate-bounce">
+                    <Lock size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white tracking-tight">Pay-Per-View Locked Asset</h3>
+                    <p className="text-xs text-neutral-400 mt-1.5 leading-normal">This specific video item requires an individual standalone micro-payment access clear token to unlock viewing credentials.</p>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-center w-full">
+                    <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">Video Pricing Fee</span>
+                    <p className="text-xl font-black text-amber-400 mt-0.5">TSh {parseInt(activeVideo.price).toLocaleString()}</p>
+                  </div>
+                  <button 
+                    onClick={() => handleProcessLocalPPV(activeVideo.id)}
+                    className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black font-extrabold py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-500/10 cursor-pointer"
+                  >
+                    Simulate PPV Pay Clearance Pass
+                  </button>
+                </div>
+              ) : (
+                <video 
+                  src={activeVideo.videoUrl} 
+                  controls 
+                  autoPlay 
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* GATEWAY ENTRY PAYWALL CONTROLLER WITH SPOTLIGHT ASSIST */}
       {isSiteLocked && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-hidden animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-hidden group/bg">
           
-          {/* 🖼️ DIRECT LOCAL FOLDER HIGH-END CINEMATIC GRAPHIC IMAGE BACKGROUND */}
+          {/* 🖼️ LOCAL FILE 11.JPG WITH HIGH-END AMBIENT INTEGRATED SPOTLIGHT HOVER REVEAL */}
           <div className="absolute inset-0 w-full h-full z-0 overflow-hidden pointer-events-none select-none">
-            {/* Multi-layered dark vignette shading to keep text contrast super high */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#070908] via-black/50 to-[#070908] z-0" />
-            <div className="absolute inset-0 bg-black/40 z-10 backdrop-blur-[2px]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-black/50 to-[#09090b] z-20" />
+            
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-all duration-500 z-10 
+              group-hover/bg:bg-black/10 
+              [background:radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.65)_60%)]" 
+            />
+            
             <img
               src="/11.jpg"
-              alt="Cinematic Backdrop"
-              className="w-full h-full object-cover scale-[1.02] object-center transition-transform duration-700"
+              alt="Cinematic Background Backdrop"
+              className="w-full h-full object-cover object-center transition-all duration-700 ease-out
+                opacity-40 scale-[1.01]
+                group-hover/bg:opacity-90 group-hover/bg:scale-[1.04]"
               onError={(e) => {
-                // Fail-safe dynamic cloud abstract backup image if your local asset isn't in your public/ folder yet
                 e.target.src = "https://unsplash.com";
               }}
             />
           </div>
 
-          {/* GLASSMORPHIC PORTAL CONTROL WORKSPACE PLATFORM */}
-          <div className="w-full max-w-[400px] bg-[#141414]/75 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 shadow-2xl shadow-black/90 space-y-5 z-20 animate-scaleUp border-t-white/15">
+
+          {/* GLASSMORPHIC PORTAL CONTROL WORKSPACE PLATFORM CARD */}
+          <div className="w-full max-w-[400px] bg-[#141414]/75 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 shadow-2xl shadow-black/90 space-y-5 z-20 border-t-white/15">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-xl bg-[#ff3b3b]/10 border border-[#ff3b3b]/20 flex items-center justify-center text-[#ff3b3b]">
-                  <Lock size={16} />
+                <div className="h-8 w-8 rounded-xl bg-[#ef4444]/10 border border-[#ef4444]/20 flex items-center justify-center text-[#ef4444]">
+                  <Lock size={16} className={isCheckingPayment ? "animate-pulse" : ""} />
                 </div>
                 <span className="font-bold text-sm tracking-tight text-white">Premium Access Gate</span>
               </div>
@@ -432,8 +518,8 @@ export default function PlayHubHome() {
             </div>
 
             <div className="grid grid-cols-2 gap-1.5 p-1 bg-black/50 border border-white/5 rounded-xl backdrop-blur-sm">
-              <button onClick={(e) => handleMethodTabSwitch(e, 'momo')} className={`py-2.5 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${paymentMethod === 'momo' ? 'bg-[#ff3b3b] text-white shadow-md' : 'text-[#aaa] hover:text-white'}`}>Mobile Money</button>
-              <button onClick={(e) => handleMethodTabSwitch(e, 'card')} className={`py-2.5 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${paymentMethod === 'card' ? 'bg-[#ff3b3b] text-white shadow-md' : 'text-[#aaa] hover:text-white'}`}>Credit Card</button>
+              <button disabled={isCheckingPayment} onClick={(e) => handleMethodTabSwitch(e, 'momo')} className={`py-2.5 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${isCheckingPayment ? 'opacity-40 cursor-not-allowed' : ''} ${paymentMethod === 'momo' ? 'bg-[#ef4444] text-white shadow-md' : 'text-[#aaa] hover:text-white'}`}>Mobile Money</button>
+              <button disabled={isCheckingPayment} onClick={(e) => handleMethodTabSwitch(e, 'card')} className={`py-2.5 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${isCheckingPayment ? 'opacity-40 cursor-not-allowed' : ''} ${paymentMethod === 'card' ? 'bg-[#ef4444] text-white shadow-md' : 'text-[#aaa] hover:text-white'}`}>Credit Card</button>
             </div>
 
             <form onSubmit={handleSiteGateSubmit} className="space-y-4">
@@ -442,31 +528,47 @@ export default function PlayHubHome() {
                   <label className="text-[10px] text-[#aaa] font-bold uppercase tracking-widest block">Select Mobile Operator</label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {['mpesa', 'tigopesa', 'airtel', 'halopesa'].map((op) => (
-                      <button key={op} type="button" onClick={(e) => handleOperatorSwitch(e, op)} className={`py-2 text-[10px] font-extrabold rounded-lg border uppercase tracking-wider transition-all duration-200 cursor-pointer ${selectedOp === op ? 'border-[#ff3b3b] bg-[#ff3b3b]/10 text-white' : 'border-white/5 bg-black/20 text-[#aaa] hover:text-white'}`}>{op.replace('pesa', '')}</button>
+                      <button key={op} disabled={isCheckingPayment} type="button" onClick={(e) => handleOperatorSwitch(e, op)} className={`py-2 text-[10px] font-extrabold rounded-lg border uppercase tracking-wider transition-all duration-200 cursor-pointer ${isCheckingPayment ? 'opacity-40 cursor-not-allowed' : ''} ${selectedOp === op ? 'border-[#ef4444] bg-[#ef4444]/10 text-white' : 'border-white/5 bg-black/20 text-[#aaa] hover:text-white'}`}>{op.replace('pesa', '')}</button>
                     ))}
                   </div>
                   <div>
                     <label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Tanzanian Mobile Number</label>
                     <div className="relative">
                       <span className="absolute left-4 top-3 text-xs font-bold text-[#666]">+255</span>
-                      <input type="tel" placeholder="740 462 193" value={momoPhone} onChange={handlePhoneInput} className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-14 pr-4 text-xs text-white font-semibold outline-none focus:border-[#ff3b3b] focus:bg-black/60 transition-all" />
+                      <input disabled={isCheckingPayment} type="tel" placeholder="740 462 193" value={momoPhone} onChange={handlePhoneInput} className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-14 pr-4 text-xs text-white font-semibold outline-none focus:border-[#ef4444] focus:bg-black/60 transition-all disabled:opacity-50" />
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3 animate-fadeIn">
-                  <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Cardholder Name</label><input type="text" placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#ff3b3b] focus:bg-black/60 transition-all" /></div>
-                  <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Card Number</label><input type="text" placeholder="4000 1234 5678 9010" value={cardNum} onChange={handleCardNumInput} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#ff3b3b] focus:bg-black/60 transition-all" /></div>
+                <div className="space-y-3">
+                  <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Cardholder Name</label><input disabled={isCheckingPayment} type="text" placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#ef4444] focus:bg-black/60 transition-all disabled:opacity-50" /></div>
+                  <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Card Number</label><input disabled={isCheckingPayment} type="text" placeholder="4000 1234 5678 9010" value={cardNum} onChange={handleCardNumInput} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#ef4444] focus:bg-black/60 transition-all disabled:opacity-50" /></div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Expiry Date</label><input type="text" placeholder="MM/YY" value={cardExp} onChange={handleCardExpInput} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white text-center outline-none focus:border-[#ff3b3b] focus:bg-black/60 transition-all" /></div>
-                    <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">CVC</label><input type="password" placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white text-center outline-none focus:border-[#ff3b3b] focus:bg-black/60 transition-all" /></div>
+                    <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Expiry Date</label><input disabled={isCheckingPayment} type="text" placeholder="MM/YY" value={cardExp} onChange={handleCardExpInput} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white text-center outline-none focus:border-[#ef4444] focus:bg-black/60 transition-all disabled:opacity-50" /></div>
+                    <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">CVC</label><input disabled={isCheckingPayment} type="password" placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white text-center outline-none focus:border-[#ef4444] focus:bg-black/60 transition-all disabled:opacity-50" /></div>
                   </div>
                 </div>
               )}
 
-              {payError && <p className="text-[#ff5f5f] text-xs font-bold text-center bg-[#ff5f5f]/10 p-2.5 rounded-xl border border-[#ff5f5f]/20 tracking-tight animate-shake">{payError}</p>}
+              {payError && (
+                <p className="text-[#ff5f5f] text-xs font-bold text-center bg-[#ff5f5f]/10 p-2.5 rounded-xl border border-[#ff5f5f]/20 tracking-tight flex items-center justify-center gap-1.5">
+                  <AlertCircle size={13} /> {payError}
+                </p>
+              )}
               
-              <button type="submit" onClick={handleVsCodeForceClick} className="w-full bg-gradient-to-r from-[#ff3b3b] to-[#ff5f5f] text-white font-extrabold py-3.5 rounded-xl text-xs tracking-wider uppercase transition-all duration-300 shadow-lg shadow-[#ff3b3b]/10 hover:shadow-[#ff3b3b]/20 cursor-pointer transform active:scale-[0.99]">
+              <button 
+                type="submit" 
+                disabled={isCheckingPayment}
+                onClick={handleVsCodeForceClick} 
+                className={`w-full text-white font-extrabold py-3.5 rounded-xl text-xs tracking-wider uppercase transition-all duration-300 shadow-lg flex items-center justify-center gap-2 cursor-pointer
+                  ${isCheckingPayment 
+                    ? 'bg-neutral-800 text-neutral-400 border border-white/5 shadow-none animate-pulse cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-[#ef4444] to-[#b91c1c] shadow-red-900/10 hover:shadow-red-900/20 active:scale-[0.99]'
+                  }`}
+              >
+                {isCheckingPayment && (
+                  <RefreshCw size={13} className="animate-spin text-[#ef4444]" />
+                )}
                 {payStatusText}
               </button>
             </form>
@@ -474,86 +576,6 @@ export default function PlayHubHome() {
         </div>
       )}
 
-
-      {/* THE EMBEDDED MEDIA IFRAME LIGHTBOX CONTROL ENGINE */}
-      {activeVideo && !isSiteLocked && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-4xl bg-[#141414] border border-[#2a2a2a] rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 bg-[#1c1c1c] border-b border-[#2a2a2a]">
-              <div className="min-w-0 pr-4">
-                <h3 className="text-sm font-bold text-white truncate">{activeVideo.title}</h3>
-                <p className="text-xs text-[#aaaaaa] mt-0.5 truncate">{activeVideo.channel}</p>
-              </div>
-              <button onClick={() => {
-                const player = document.getElementById('main-lightbox-player');
-                if (player) player.pause();
-                setActiveVideo(null);
-              }} className="text-[#888] hover:text-white bg-[#262626] hover:bg-[#333] h-8 w-8 rounded-full flex items-center justify-center cursor-pointer transition-colors duration-200">
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="relative aspect-video w-full bg-black flex items-center justify-center">
-              {isPpvLocked ? (
-                <div className="text-center p-6 space-y-4 max-w-sm z-20 animate-scaleUp">
-                  <div className="h-14 w-12 mx-auto bg-[#ff3b3b]/10 border border-[#ff3b3b]/20 rounded-2xl flex items-center justify-center text-[#ff3b3b]">
-                    <DollarSign size={24} />
-                  </div>
-                  <h3 className="text-base font-bold text-white tracking-tight">Premium Content Locked</h3>
-                  <p className="text-xs text-[#aaaaaa] leading-relaxed">This premium video requires a separate one-time Pay-Per-View checkout unlock fee of <span className="text-white font-bold">TSh {parseInt(activeVideo.price).toLocaleString()}</span>.</p>
-                  <button onClick={() => handleProcessLocalPPV(activeVideo.id)} className="w-full bg-[#ff3b3b] hover:bg-[#ff5f5f] text-white text-xs font-bold py-3 rounded-xl transition-all duration-200 shadow-lg cursor-pointer transform active:scale-[0.99]">
-                    Unlock Video Asset Instantly
-                  </button>
-                </div>
-              ) : activeVideo.desc && activeVideo.desc.includes('<iframe') ? (
-                <div 
-                  className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full border-0"
-                  dangerouslySetInnerHTML={{ __html: activeVideo.desc }}
-                />
-              ) : (
-                /* EXPLICIT HARDWARE OVERRIDE FOR MUTED VOLUME CONTROLS */
-                <div className="w-full h-full relative group">
-                  <video 
-                    id="main-lightbox-player"
-                    key={activeVideo.id}
-                    src={activeVideo.desc ? `${activeVideo.desc}?t=${Date.now()}` : "https://w3schools.com"} 
-                    controls 
-                    playsInline
-                    preload="auto"
-                    crossOrigin="anonymous"
-                    onPlay={(e) => {
-                      e.target.muted = false;
-                      if (e.target.volume === 0) e.target.volume = 1.0;
-                    }}
-                    onLoadedData={(e) => {
-                      e.target.removeAttribute('muted');
-                      e.target.muted = false;
-                      e.target.volume = 1.0;
-                    }}
-                    className="w-full h-full object-contain" 
-                  />
-                  {/* SYSTEM AUDIO INITIALIZATION OVERLAY SCREEN */}
-                  <div 
-                    id="audio-unmute-gate"
-                    onClick={(e) => {
-                      const player = document.getElementById('main-lightbox-player');
-                      if (player) {
-                        player.removeAttribute('muted');
-                        player.muted = false;
-                        player.volume = 1.0;
-                        player.play().catch(() => {});
-                      }
-                      e.currentTarget.style.display = 'none';
-                    }}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 cursor-pointer z-30 transition-all duration-300 hover:bg-black/40"
-                  >
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
