@@ -9,7 +9,7 @@ import {
   Compass, 
   Film, 
   Grid, 
-  Lock, 
+  Lock,
   Unlock, 
   Smartphone, 
   CreditCard, 
@@ -547,9 +547,6 @@ export default function PlayHubHome() {
                     }}
                     className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 cursor-pointer z-30 transition-all duration-300 hover:bg-black/40"
                   >
-                    <button className="bg-gradient-to-r from-[#ff3b3b] to-[#ff5f5f] text-white font-bold px-6 py-3 rounded-full text-xs shadow-2xl flex items-center gap-2 transform active:scale-95 transition-all duration-200 cursor-pointer uppercase tracking-wider">
-                      <Volume2 size={14} /> Initialize Sound & Play Video
-                    </button>
                   </div>
                 </div>
               )}
