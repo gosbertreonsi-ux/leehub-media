@@ -1,19 +1,20 @@
+//IMPORTS AND COMPS SETUP
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Play, 
-  Search, 
-  Tv, 
-  Sparkles, 
-  Compass, 
-  Film, 
-  Grid, 
+import {
+  Play,
+  Search,
+  Tv,
+  Sparkles,
+  Compass,
+  Film,
+  Grid,
   Lock,
-  Unlock, 
-  Smartphone, 
-  CreditCard, 
-  AlertCircle, 
+  Unlock,
+  Smartphone,
+  CreditCard,
+  AlertCircle,
   RefreshCw,
   Clock,
   CheckCircle2,
@@ -23,16 +24,28 @@ import {
   DollarSign
 } from 'lucide-react';
 
+// Placeholder thumbnail — self-contained SVG so it never depends on an external host
+const FALLBACK_THUMB =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225">
+       <rect width="100%" height="100%" fill="#18181b"/>
+       <text x="50%" y="50%" fill="#52525b" font-family="sans-serif" font-size="16"
+         text-anchor="middle" dominant-baseline="middle">No thumbnail</text>
+     </svg>`
+  );
+
 export default function PlayHubHome() {
-  // Navigation & Core Content States
+  //STATE VARIABLES
+  // Navigation & Core Content
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isSiteLocked, setIsSiteLocked] = useState(true);
+  const [isSiteLocked, setIsSiteLocked] = useState(false);
   const [activeChip, setActiveChip] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Paywall Engine States
-  const [paymentMethod, setPaymentMethod] = useState('momo'); 
+
+  // Paywall Engine
+  const [paymentMethod, setPaymentMethod] = useState('momo');
   const [selectedOp, setSelectedOp] = useState('mpesa');
   const [momoPhone, setMomoPhone] = useState('');
   const [cardName, setCardName] = useState('');
@@ -42,56 +55,62 @@ export default function PlayHubHome() {
   const [payError, setPayError] = useState('');
   const [payStatusText, setPayStatusText] = useState('Pay with M-Pesa');
 
-  // ⚡ TRANSACTION VERIFICATION & POLLING STATES
+  // Site-wide payment verification/polling
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [currentTransactionId, setCurrentTransactionId] = useState(null);
 
-  // ⚡ PREMIUM INDIVIDUAL VIDEO VERIFICATION & POLLING STATES
+  // Per-video (PPV) payment verification/polling
   const [isCheckingPpv, setIsCheckingPpv] = useState(false);
   const [currentPpvTxId, setCurrentPpvTxId] = useState(null);
   const [ppvStatusText, setPpvStatusText] = useState('Pay to Unlock Video');
 
-  // Video Lightbox Context States
+  // Lightbox / video player
   const [activeVideo, setActiveVideo] = useState(null);
   const [isPpvLocked, setIsPpvLocked] = useState(false);
 
   const BACKEND_API_URL = '/api';
   const operatorNames = { mpesa: 'M-Pesa', tigopesa: 'Tigo Pesa', airtel: 'Airtel Money', halopesa: 'HaloPesa' };
 
-    // DUAL LOOKUP FETCH ROUTINE: Combines remote database with local storage streams flawlessly
+  //DATA FETCHING
   const fetchCloudVideos = async () => {
     let dbVideos = [];
     let localVideos = [];
 
-    // Step A: Pull from remote database API
     try {
       const res = await fetch(`${BACKEND_API_URL}/videos`);
-      if (res.ok) {
-        dbVideos = await res.json();
-      }
+      if (res.ok) dbVideos = await res.json();
     } catch (err) {
       console.warn('Backend link offline, falling back to cache repositories.');
     }
 
-    // Step B: Pull from administrative dual-sync local mirrors
     try {
       const rawAdmin = window.localStorage.getItem('playhub_admin_videos');
       const rawHome = window.localStorage.getItem('playhub_home_feed_videos');
       const chosenRaw = rawHome || rawAdmin;
-      if (chosenRaw) {
-        localVideos = JSON.parse(chosenRaw);
-      }
+      if (chosenRaw) localVideos = JSON.parse(chosenRaw);
     } catch (e) {
       console.error('Local feed stream reading block:', e);
     }
 
-    // Step C: Merge matrices and wipe duplicating index IDs
     const compositeMap = new Map();
     [...localVideos, ...dbVideos].forEach(item => {
       if (item && item.id) compositeMap.set(item.id, item);
     });
 
-    const finalSynchronizedFeed = Array.from(compositeMap.values()).sort((a, b) => 
+    // NORMALIZE: AdminDashboard saves videos as { thumb, length, desc, ... }
+    // while this screen reads { thumbnailUrl, duration, videoUrl, ... } — map them here
+    // so nothing downstream has to know about the admin's field names.
+    const normalized = Array.from(compositeMap.values()).map((v) => {
+      const thumbIsUsableUrl = v.thumb && !v.thumb.startsWith('linear');
+      return {
+        ...v,
+        thumbnailUrl: v.thumbnailUrl || (thumbIsUsableUrl ? v.thumb : null),
+        duration: v.duration || v.length || '0:00',
+        videoUrl: v.videoUrl || v.desc || '',
+      };
+    });
+
+    const finalSynchronizedFeed = normalized.sort((a, b) =>
       new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0)
     );
 
@@ -99,7 +118,75 @@ export default function PlayHubHome() {
     setLoading(false);
   };
 
-    const handleOperatorSwitch = (e, networkKey) => {
+  //FETCH CLOUD VIDEOS ON MOUNT
+  useEffect(() => {
+    fetchCloudVideos();
+  }, []);
+
+  //POLL SITE-WIDE PAYMENT STATUS
+  useEffect(() => {
+    if (!currentTransactionId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${BACKEND_API_URL}/payments/status/${currentTransactionId}`);
+        const data = await res.json();
+
+        if (data.status === 'completed' || data.status === 'success') {
+          clearInterval(interval);
+          setIsCheckingPayment(false);
+          setCurrentTransactionId(null);
+          setIsSiteLocked(false);
+          setPayStatusText('Pay with M-Pesa');
+        } else if (data.status === 'failed' || data.status === 'cancelled') {
+          clearInterval(interval);
+          setIsCheckingPayment(false);
+          setCurrentTransactionId(null);
+          setPayError('Payment was not completed. Please try again.');
+          setPayStatusText('Pay with M-Pesa');
+        }
+        // otherwise still pending — keep polling
+      } catch (err) {
+        console.error('Payment status poll failed:', err);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [currentTransactionId]);
+
+  //POLL PER-VIDEO (PPV) PAYMENT STATUS
+  useEffect(() => {
+    if (!currentPpvTxId || !activeVideo) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${BACKEND_API_URL}/payments/status/${currentPpvTxId}`);
+        const data = await res.json();
+
+        if (data.status === 'completed' || data.status === 'success') {
+          clearInterval(interval);
+          window.localStorage.setItem(`playhub_ppv_paid_${activeVideo.id}`, '1');
+          setIsCheckingPpv(false);
+          setCurrentPpvTxId(null);
+          setIsPpvLocked(false);
+          setPpvStatusText('Pay to Unlock Video');
+        } else if (data.status === 'failed' || data.status === 'cancelled') {
+          clearInterval(interval);
+          setIsCheckingPpv(false);
+          setCurrentPpvTxId(null);
+          setPpvStatusText(`Pay TSh ${parseInt(activeVideo.price).toLocaleString()} to Unlock`);
+        }
+        // otherwise still pending — keep polling
+      } catch (err) {
+        console.error('PPV status poll failed:', err);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [currentPpvTxId, activeVideo]);
+
+  //PAYWALL FORM HANDLERS
+  const handleOperatorSwitch = (e, networkKey) => {
     e.preventDefault(); e.stopPropagation();
     if (isCheckingPayment) return;
     setSelectedOp(networkKey);
@@ -119,7 +206,7 @@ export default function PlayHubHome() {
 
   const handleCardNumInput = (e) => {
     const v = e.target.value.replace(/\D/g, '').slice(0, 19);
-    const spaced = v.replace(/(\d{4})(?=\d)/g, '\$1 ');
+    const spaced = v.replace(/(\d{4})(?=\d)/g, '$1 ');
     setCardNum(spaced);
   };
 
@@ -129,8 +216,9 @@ export default function PlayHubHome() {
     setCardExp(v);
   };
 
+  //VIDEO ACCESS CHECK
   const handleVerifyVideoAccess = (video) => {
-    if (isSiteLocked) return; 
+    if (isSiteLocked) return;
     const ppvStorageKey = `playhub_ppv_paid_${video.id}`;
     const isVideoPurchased = window.localStorage.getItem(ppvStorageKey) === '1';
     const cleanPrice = parseInt(video.price);
@@ -145,7 +233,8 @@ export default function PlayHubHome() {
     }
   };
 
-    const handleSiteGateSubmit = async (e) => {
+  //SITE GATE PAYMENT
+  const handleSiteGateSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (isCheckingPayment) return;
     setPayError('');
@@ -163,7 +252,7 @@ export default function PlayHubHome() {
 
       if (cardName.trim().length < 2) { setPayError('Enter the name on the card.'); return; }
       if (cleanCardNum.length < 13 || cleanCardNum.length > 19) { setPayError('Enter a valid card number.'); return; }
-      if (!/^\d{2}\/\d{2}\$/.test(cleanCardExp)) { setPayError('Expiry must be in MM/YY format (e.g., 08/27).'); return; }
+      if (!/^\d{2}\/\d{2}$/.test(cleanCardExp)) { setPayError('Expiry must be in MM/YY format (e.g., 08/27).'); return; }
       if (cleanCardCvc.length < 3) { setPayError('Enter a valid CVC.'); return; }
     }
 
@@ -188,19 +277,14 @@ export default function PlayHubHome() {
 
       setCurrentTransactionId(data.transactionId);
       setPayStatusText('Enter PIN prompt on your phone...');
-      
+
     } catch (err) {
       setPayError(err.message || 'Payment initiation failed. Please check network.');
       setIsCheckingPayment(false);
     }
   };
 
-  const handleVsCodeForceClick = (e) => {
-    e.preventDefault(); e.stopPropagation();
-    if (!isCheckingPayment) handleSiteGateSubmit(null); 
-  };
-
-  // Asynchronous Payment Handler for Premium Video Items
+  //PPV PAYMENT
   const handleProcessLocalPPV = async (video) => {
     if (isCheckingPpv) return;
     setIsCheckingPpv(true);
@@ -212,7 +296,7 @@ export default function PlayHubHome() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           method: 'momo',
-          phone: `255${momoPhone || '740000000'}`, 
+          phone: `255${momoPhone || '740000000'}`,
           operator: selectedOp,
           amount: parseInt(video.price),
           currency: 'TZS',
@@ -225,7 +309,7 @@ export default function PlayHubHome() {
 
       setCurrentPpvTxId(data.transactionId);
       setPpvStatusText('Enter PIN on phone...');
-      
+
     } catch (err) {
       alert(err.message || 'Video access payment request failed.');
       setPpvStatusText(`Pay TSh ${parseInt(video.price).toLocaleString()} to Unlock`);
@@ -233,7 +317,8 @@ export default function PlayHubHome() {
     }
   };
 
-    const getTimeAgo = (isoString) => {
+  //RELATIVE TIME
+  const getTimeAgo = (isoString) => {
     if (!isoString) return 'just now';
     const mins = Math.round((Date.now() - new Date(isoString).getTime()) / 60000);
     if (mins < 1) return 'just now';
@@ -244,10 +329,11 @@ export default function PlayHubHome() {
     return `${Math.round(hrs / 24)}d ago`;
   };
 
+  //FILTERING LOGIC
   const filteredVideos = videos.filter((v) => {
     const textQuery = searchQuery.toLowerCase();
     const chipQuery = activeChip.toLowerCase();
-    
+
     const matchesSearch = !searchQuery || (
       v.title?.toLowerCase().includes(textQuery) ||
       v.channel?.toLowerCase().includes(textQuery)
@@ -268,9 +354,9 @@ export default function PlayHubHome() {
     return matchesSearch && matchesChip;
   });
 
-    return (
+  return (
     <div className={`min-h-screen bg-[#09090b] text-[#f8fafc] font-sans antialiased selection:bg-[#ef4444]/30 ${isSiteLocked ? 'overflow-hidden max-h-screen' : ''}`}>
-      
+
       {/* CINEMATIC NAVIGATION HEADER */}
       <nav className="sticky top-0 z-40 flex items-center justify-between gap-4 border-b border-[#27272a] bg-[#09090b]/90 backdrop-blur-md px-6 py-3">
         <div className="flex items-center gap-2.5 shrink-0 select-none">
@@ -282,9 +368,9 @@ export default function PlayHubHome() {
 
         <div className="relative max-w-md w-full hidden md:block">
           <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-neutral-500" />
-          <input 
-            type="text" 
-            placeholder="Search premium videos, channels..." 
+          <input
+            type="text"
+            placeholder="Search premium videos, channels..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-[#18181b] border border-[#27272a] rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-[#ef4444] transition-all"
@@ -300,18 +386,17 @@ export default function PlayHubHome() {
         </div>
       </nav>
 
-
       {/* CORE INTERFACE WORKSPACE MAIN BODY CONTAINER */}
       <main className="p-6 max-w-7xl mx-auto space-y-6">
-        
+
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
           {['All', 'Premium', 'Free', 'Movies', 'Series', 'Live'].map((chip) => (
             <button
               key={chip}
               onClick={() => setActiveChip(chip)}
               className={`px-4 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition-all border ${
-                activeChip === chip 
-                  ? 'bg-white text-black border-white shadow-md' 
+                activeChip === chip
+                  ? 'bg-white text-black border-white shadow-md'
                   : 'bg-[#18181b] text-neutral-400 border-[#27272a] hover:text-white hover:bg-[#27272a]'
               }`}
             >
@@ -341,20 +426,21 @@ export default function PlayHubHome() {
             {filteredVideos.map((video) => {
               const itemPrice = parseInt(video.price);
               const isPremium = !isNaN(itemPrice) && itemPrice > 0;
-              
+
               return (
-                <div 
-                  key={video.id} 
+                <div
+                  key={video.id}
                   onClick={() => handleVerifyVideoAccess(video)}
                   className="group bg-[#141417] border border-[#27272a] hover:border-neutral-700 rounded-2xl overflow-hidden cursor-pointer transition-all hover:-translate-y-0.5 shadow-lg flex flex-col"
                 >
                   <div className="relative aspect-video w-full bg-neutral-900 overflow-hidden">
-                    <img 
-                      src={video.thumbnailUrl || 'https://unsplash.com'} 
+                    <img
+                      src={video.thumbnailUrl || FALLBACK_THUMB}
                       alt={video.title}
+                      onError={(e) => { e.target.onerror = null; e.target.src = FALLBACK_THUMB; }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    
+
                     <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
                       {isPremium ? (
                         <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-md backdrop-blur-md uppercase tracking-wider">Premium</span>
@@ -396,13 +482,21 @@ export default function PlayHubHome() {
       {activeVideo && (
         <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn">
           <div className="bg-[#0e0e11] border border-[#27272a] w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
-            
+
             <div className="flex items-center justify-between p-4 border-b border-[#27272a] bg-neutral-900/40">
               <div className="truncate pr-4">
                 <span className="text-[10px] bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20 font-bold px-2 py-0.5 rounded uppercase tracking-wider">Theater View</span>
                 <h2 className="text-sm font-bold text-white truncate mt-1 tracking-tight">{activeVideo.title}</h2>
               </div>
-              <button onClick={() => { setActiveVideo(null); setIsPpvLocked(false); setIsCheckingPpv(false); setCurrentPpvTxId(null); }} className="h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer">
+              <button
+                onClick={() => {
+                  setActiveVideo(null);
+                  setIsPpvLocked(false);
+                  setIsCheckingPpv(false);
+                  setCurrentPpvTxId(null);
+                }}
+                className="h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -421,7 +515,7 @@ export default function PlayHubHome() {
                     <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">Video Pricing Fee</span>
                     <p className="text-xl font-black text-amber-400 mt-0.5">TSh {parseInt(activeVideo.price).toLocaleString()}</p>
                   </div>
-                  <button 
+                  <button
                     disabled={isCheckingPpv}
                     onClick={() => handleProcessLocalPPV(activeVideo)}
                     className={`w-full font-extrabold py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer
@@ -436,11 +530,20 @@ export default function PlayHubHome() {
                     {isCheckingPpv ? ppvStatusText : `Pay TSh ${parseInt(activeVideo.price).toLocaleString()} to Unlock`}
                   </button>
                 </div>
+              ) : activeVideo.videoUrl?.trim().startsWith('<iframe') ? (
+                // Vimeo / Bunny / any raw <iframe embed> saved by the admin dashboard
+                <div
+                  className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full"
+                  dangerouslySetInnerHTML={{ __html: activeVideo.videoUrl }}
+                />
               ) : (
-                <video 
-                  src={activeVideo.videoUrl} 
-                  controls 
-                  autoPlay 
+                // Direct playable file (e.g. Supabase-hosted upload)
+                <video
+                  src={activeVideo.videoUrl}
+                  controls
+                  autoPlay
+                  muted
+                  playsInline
                   className="w-full h-full object-contain"
                 />
               )}
@@ -449,16 +552,15 @@ export default function PlayHubHome() {
         </div>
       )}
 
-
       {/* GATEWAY ENTRY PAYWALL CONTROLLER WITH SPOTLIGHT ASSIST */}
       {isSiteLocked && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-hidden group/bg">
-          
+
           <div className="absolute inset-0 w-full h-full z-0 overflow-hidden pointer-events-none select-none">
             <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-black/50 to-[#09090b] z-20" />
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-all duration-500 z-10 
-              group-hover/bg:bg-black/10 
-              [background:radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.65)_60%)]" 
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-all duration-500 z-10
+              group-hover/bg:bg-black/10
+              [background:radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.65)_60%)]"
             />
             <img
               src="/11.jpg"
@@ -466,9 +568,7 @@ export default function PlayHubHome() {
               className="w-full h-full object-cover object-center transition-all duration-700 ease-out
                 opacity-40 scale-[1.01]
                 group-hover/bg:opacity-90 group-hover/bg:scale-[1.04]"
-              onError={(e) => {
-                e.target.src = "https://unsplash.com";
-              }}
+              onError={(e) => { e.target.onerror = null; e.target.src = FALLBACK_THUMB; }}
             />
           </div>
 
@@ -481,7 +581,7 @@ export default function PlayHubHome() {
                 <span className="font-bold text-sm tracking-tight text-white">Premium Access Gate</span>
               </div>
             </div>
-            
+
             <div className="bg-black/40 border border-white/5 rounded-2xl p-4 text-center relative overflow-hidden backdrop-blur-sm">
               <p className="text-[11px] font-bold text-[#aaa] uppercase tracking-widest">Handshake Passcode Fee</p>
               <h2 className="text-3xl font-black text-white mt-1 flex items-center justify-center gap-1">
@@ -527,14 +627,13 @@ export default function PlayHubHome() {
                   <AlertCircle size={13} /> {payError}
                 </p>
               )}
-              
-              <button 
-                type="submit" 
+
+              <button
+                type="submit"
                 disabled={isCheckingPayment}
-                onClick={handleVsCodeForceClick} 
                 className={`w-full text-white font-extrabold py-3.5 rounded-xl text-xs tracking-wider uppercase transition-all duration-300 shadow-lg flex items-center justify-center gap-2 cursor-pointer
-                  ${isCheckingPayment 
-                    ? 'bg-neutral-800 text-neutral-400 border border-white/5 shadow-none animate-pulse cursor-not-allowed' 
+                  ${isCheckingPayment
+                    ? 'bg-neutral-800 text-neutral-400 border border-white/5 shadow-none animate-pulse cursor-not-allowed'
                     : 'bg-gradient-to-r from-[#ef4444] to-[#b91c1c] shadow-red-900/10 hover:shadow-red-900/20 active:scale-[0.99]'
                   }`}
               >
