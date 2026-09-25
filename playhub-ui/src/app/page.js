@@ -42,7 +42,7 @@ export default function PlayHubHome() {
   // Navigation & Core Content
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isSiteLocked, setIsSiteLocked] = useState(false);
+  const [isSiteLocked, setIsSiteLocked] = useState(true);
   const [activeChip, setActiveChip] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
