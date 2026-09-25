@@ -490,87 +490,88 @@ export default function PlayHubHome() {
         )}
       </main>
 
-      {/* VIDEO LIGHTBOX PLAYER — full modal or a floating mini-player that lets the page scroll */}
+      {/* VIDEO LIGHTBOX PLAYER — ONE persistent tree for both full & mini modes.
+          Only className/text changes between modes; the <video>/<iframe> node itself
+          never unmounts, so playback position and "playing" state survive the toggle. */}
       {activeVideo && (
-        isMiniPlayer ? (
-          /* MINI-PLAYER: docked bottom-right, page behind stays scrollable/clickable */
-          <div className="fixed bottom-4 right-4 z-50 w-64 sm:w-80 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 border border-[#27272a] bg-[#0e0e11] animate-fadeIn">
-            <div className="flex items-center justify-between px-2.5 py-2 bg-neutral-900/80">
-              <h2 className="text-[11px] font-bold text-white truncate pr-2">{activeVideo.title}</h2>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  onClick={() => setIsMiniPlayer(false)}
-                  className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-300 hover:text-white transition-all cursor-pointer"
-                  title="Expand"
+        <div
+          className={
+            isMiniPlayer
+              ? 'fixed bottom-4 right-4 z-50 w-64 sm:w-80 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 border border-[#27272a] bg-[#0e0e11] animate-fadeIn transition-all duration-300'
+              : 'fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn'
+          }
+        >
+          <div
+            className={
+              isMiniPlayer
+                ? 'w-full flex flex-col'
+                : 'bg-[#0e0e11] border border-[#27272a] w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]'
+            }
+          >
+            <div
+              className={
+                isMiniPlayer
+                  ? 'flex items-center justify-between px-2.5 py-2 bg-neutral-900/80'
+                  : 'flex items-center justify-between p-4 border-b border-[#27272a] bg-neutral-900/40'
+              }
+            >
+              <div className="truncate pr-4">
+                {!isMiniPlayer && (
+                  <span className="text-[10px] bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20 font-bold px-2 py-0.5 rounded uppercase tracking-wider">Theater View</span>
+                )}
+                <h2
+                  className={
+                    isMiniPlayer
+                      ? 'text-[11px] font-bold text-white truncate'
+                      : 'text-sm font-bold text-white truncate mt-1 tracking-tight'
+                  }
                 >
-                  <Maximize2 size={12} />
+                  {activeVideo.title}
+                </h2>
+              </div>
+              <div className={isMiniPlayer ? 'flex items-center gap-1 shrink-0' : 'flex items-center gap-2 shrink-0'}>
+                <button
+                  onClick={() => setIsMiniPlayer(!isMiniPlayer)}
+                  className={
+                    isMiniPlayer
+                      ? 'h-6 w-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-300 hover:text-white transition-all cursor-pointer'
+                      : 'h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer'
+                  }
+                  title={isMiniPlayer ? 'Expand' : 'Minimize — keep watching while you browse'}
+                >
+                  {isMiniPlayer ? <Maximize2 size={12} /> : <Minimize2 size={14} />}
                 </button>
                 <button
                   onClick={handleCloseVideo}
-                  className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-300 hover:text-white transition-all cursor-pointer"
+                  className={
+                    isMiniPlayer
+                      ? 'h-6 w-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-300 hover:text-white transition-all cursor-pointer'
+                      : 'h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer'
+                  }
                   title="Close"
                 >
-                  <X size={12} />
+                  <X size={isMiniPlayer ? 12 : 16} />
                 </button>
               </div>
             </div>
 
-            <div className="aspect-video bg-black relative">
+            <div
+              className={
+                isMiniPlayer
+                  ? 'aspect-video bg-black relative'
+                  : 'flex-1 bg-black relative flex items-center justify-center aspect-video min-h-[300px]'
+              }
+            >
               {isPpvLocked ? (
-                <button
-                  onClick={() => setIsMiniPlayer(false)}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-center p-3 cursor-pointer"
-                >
-                  <Lock size={16} className="text-amber-400" />
-                  <span className="text-[10px] text-neutral-300 font-semibold">Locked — tap to expand & unlock</span>
-                </button>
-              ) : activeVideo.videoUrl?.trim().startsWith('<iframe') ? (
-                <div
-                  className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full"
-                  dangerouslySetInnerHTML={{ __html: activeVideo.videoUrl }}
-                />
-              ) : (
-                <video
-                  src={activeVideo.videoUrl}
-                  controls
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-contain"
-                />
-              )}
-            </div>
-          </div>
-        ) : (
-          /* FULL MODAL: theater view, blocks the page behind it */
-          <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn">
-            <div className="bg-[#0e0e11] border border-[#27272a] w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
-
-              <div className="flex items-center justify-between p-4 border-b border-[#27272a] bg-neutral-900/40">
-                <div className="truncate pr-4">
-                  <span className="text-[10px] bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20 font-bold px-2 py-0.5 rounded uppercase tracking-wider">Theater View</span>
-                  <h2 className="text-sm font-bold text-white truncate mt-1 tracking-tight">{activeVideo.title}</h2>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
+                isMiniPlayer ? (
                   <button
-                    onClick={() => setIsMiniPlayer(true)}
-                    className="h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer"
-                    title="Minimize — keep watching while you browse"
+                    onClick={() => setIsMiniPlayer(false)}
+                    className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-center p-3 cursor-pointer"
                   >
-                    <Minimize2 size={14} />
+                    <Lock size={16} className="text-amber-400" />
+                    <span className="text-[10px] text-neutral-300 font-semibold">Locked — tap to expand & unlock</span>
                   </button>
-                  <button
-                    onClick={handleCloseVideo}
-                    className="h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer"
-                    title="Close"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex-1 bg-black relative flex items-center justify-center aspect-video min-h-[300px]">
-                {isPpvLocked ? (
+                ) : (
                   <div className="absolute inset-0 bg-[#0e0e11]/90 backdrop-blur-md p-6 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto z-10">
                     <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
                       <Lock size={20} className={isCheckingPpv ? "animate-pulse" : ""} />
@@ -598,27 +599,30 @@ export default function PlayHubHome() {
                       {isCheckingPpv ? ppvStatusText : `Pay TSh ${parseInt(activeVideo.price).toLocaleString()} to Unlock`}
                     </button>
                   </div>
-                ) : activeVideo.videoUrl?.trim().startsWith('<iframe') ? (
-                  // Vimeo / Bunny / any raw <iframe embed> saved by the admin dashboard
-                  <div
-                    className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full"
-                    dangerouslySetInnerHTML={{ __html: activeVideo.videoUrl }}
-                  />
-                ) : (
-                  // Direct playable file (e.g. Supabase-hosted upload)
-                  <video
-                    src={activeVideo.videoUrl}
-                    controls
-                    autoPlay
-                    muted
-                    playsInline
-                    className="w-full h-full object-contain"
-                  />
-                )}
-              </div>
+                )
+              ) : activeVideo.videoUrl?.trim().startsWith('<iframe') ? (
+                // Vimeo / Bunny / any raw <iframe embed> saved by the admin dashboard
+                // — this stays mounted across mode switches, so playback continues.
+                <div
+                  className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full"
+                  dangerouslySetInnerHTML={{ __html: activeVideo.videoUrl }}
+                />
+              ) : (
+                // Direct playable file — this <video> node stays mounted across mode
+                // switches (same tree position in both branches), so currentTime and
+                // "playing" state are preserved instead of restarting from 0.
+                <video
+                  src={activeVideo.videoUrl}
+                  controls
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              )}
             </div>
           </div>
-        )
+        </div>
       )}
 
       {/* GATEWAY ENTRY PAYWALL CONTROLLER WITH SPOTLIGHT ASSIST */}
