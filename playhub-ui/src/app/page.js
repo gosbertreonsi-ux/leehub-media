@@ -238,7 +238,7 @@ export default function PlayHubHome() {
     setActiveVideo(video);
     setIsMiniPlayer(false);
     if (!isFree && !isVideoPurchased) {
-      //setIsPpvLocked(true);
+      setIsPpvLocked(true);
       setPpvStatusText(`Pay TSh ${cleanPrice.toLocaleString()} to Unlock`);
     } else {
       setIsPpvLocked(false);
