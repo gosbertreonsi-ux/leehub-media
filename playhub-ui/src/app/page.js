@@ -21,7 +21,9 @@ import {
   X,
   SlidersHorizontal,
   Sliders,
-  DollarSign
+  DollarSign,
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
 
 // Placeholder thumbnail — self-contained SVG so it never depends on an external host
@@ -67,6 +69,15 @@ export default function PlayHubHome() {
   // Lightbox / video player
   const [activeVideo, setActiveVideo] = useState(null);
   const [isPpvLocked, setIsPpvLocked] = useState(false);
+  const [isMiniPlayer, setIsMiniPlayer] = useState(false);
+
+  const handleCloseVideo = () => {
+    setActiveVideo(null);
+    setIsPpvLocked(false);
+    setIsCheckingPpv(false);
+    setCurrentPpvTxId(null);
+    setIsMiniPlayer(false);
+  };
 
   const BACKEND_API_URL = '/api';
   const operatorNames = { mpesa: 'M-Pesa', tigopesa: 'Tigo Pesa', airtel: 'Airtel Money', halopesa: 'HaloPesa' };
@@ -225,6 +236,7 @@ export default function PlayHubHome() {
     const isFree = isNaN(cleanPrice) || cleanPrice <= 0;
 
     setActiveVideo(video);
+    setIsMiniPlayer(false);
     if (!isFree && !isVideoPurchased) {
       setIsPpvLocked(true);
       setPpvStatusText(`Pay TSh ${cleanPrice.toLocaleString()} to Unlock`);
@@ -478,66 +490,46 @@ export default function PlayHubHome() {
         )}
       </main>
 
-      {/* VIDEO LIGHTBOX PLAYER MODAL LAYER OVERLAY CONTAINER */}
+      {/* VIDEO LIGHTBOX PLAYER — full modal or a floating mini-player that lets the page scroll */}
       {activeVideo && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn">
-          <div className="bg-[#0e0e11] border border-[#27272a] w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
-
-            <div className="flex items-center justify-between p-4 border-b border-[#27272a] bg-neutral-900/40">
-              <div className="truncate pr-4">
-                <span className="text-[10px] bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20 font-bold px-2 py-0.5 rounded uppercase tracking-wider">Theater View</span>
-                <h2 className="text-sm font-bold text-white truncate mt-1 tracking-tight">{activeVideo.title}</h2>
+        isMiniPlayer ? (
+          /* MINI-PLAYER: docked bottom-right, page behind stays scrollable/clickable */
+          <div className="fixed bottom-4 right-4 z-50 w-64 sm:w-80 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 border border-[#27272a] bg-[#0e0e11] animate-fadeIn">
+            <div className="flex items-center justify-between px-2.5 py-2 bg-neutral-900/80">
+              <h2 className="text-[11px] font-bold text-white truncate pr-2">{activeVideo.title}</h2>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => setIsMiniPlayer(false)}
+                  className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-300 hover:text-white transition-all cursor-pointer"
+                  title="Expand"
+                >
+                  <Maximize2 size={12} />
+                </button>
+                <button
+                  onClick={handleCloseVideo}
+                  className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-300 hover:text-white transition-all cursor-pointer"
+                  title="Close"
+                >
+                  <X size={12} />
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setActiveVideo(null);
-                  setIsPpvLocked(false);
-                  setIsCheckingPpv(false);
-                  setCurrentPpvTxId(null);
-                }}
-                className="h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer"
-              >
-                <X size={16} />
-              </button>
             </div>
 
-            <div className="flex-1 bg-black relative flex items-center justify-center aspect-video min-h-[300px]">
+            <div className="aspect-video bg-black relative">
               {isPpvLocked ? (
-                <div className="absolute inset-0 bg-[#0e0e11]/90 backdrop-blur-md p-6 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto z-10">
-                  <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
-                    <Lock size={20} className={isCheckingPpv ? "animate-pulse" : ""} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-white tracking-tight">Pay-Per-View Locked Asset</h3>
-                    <p className="text-xs text-neutral-400 mt-1.5 leading-normal">This specific video item requires an individual standalone micro-payment access token to unlock viewing credentials.</p>
-                  </div>
-                  <div className="bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-center w-full">
-                    <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">Video Pricing Fee</span>
-                    <p className="text-xl font-black text-amber-400 mt-0.5">TSh {parseInt(activeVideo.price).toLocaleString()}</p>
-                  </div>
-                  <button
-                    disabled={isCheckingPpv}
-                    onClick={() => handleProcessLocalPPV(activeVideo)}
-                    className={`w-full font-extrabold py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer
-                      ${isCheckingPpv
-                        ? 'bg-neutral-800 text-neutral-500 border border-white/5 shadow-none animate-pulse cursor-not-allowed'
-                        : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black shadow-amber-500/10 active:scale-[0.99]'
-                      }`}
-                  >
-                    {isCheckingPpv && (
-                      <RefreshCw size={12} className="animate-spin text-amber-500" />
-                    )}
-                    {isCheckingPpv ? ppvStatusText : `Pay TSh ${parseInt(activeVideo.price).toLocaleString()} to Unlock`}
-                  </button>
-                </div>
+                <button
+                  onClick={() => setIsMiniPlayer(false)}
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-center p-3 cursor-pointer"
+                >
+                  <Lock size={16} className="text-amber-400" />
+                  <span className="text-[10px] text-neutral-300 font-semibold">Locked — tap to expand & unlock</span>
+                </button>
               ) : activeVideo.videoUrl?.trim().startsWith('<iframe') ? (
-                // Vimeo / Bunny / any raw <iframe embed> saved by the admin dashboard
                 <div
                   className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full"
                   dangerouslySetInnerHTML={{ __html: activeVideo.videoUrl }}
                 />
               ) : (
-                // Direct playable file (e.g. Supabase-hosted upload)
                 <video
                   src={activeVideo.videoUrl}
                   controls
@@ -549,7 +541,84 @@ export default function PlayHubHome() {
               )}
             </div>
           </div>
-        </div>
+        ) : (
+          /* FULL MODAL: theater view, blocks the page behind it */
+          <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn">
+            <div className="bg-[#0e0e11] border border-[#27272a] w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
+
+              <div className="flex items-center justify-between p-4 border-b border-[#27272a] bg-neutral-900/40">
+                <div className="truncate pr-4">
+                  <span className="text-[10px] bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20 font-bold px-2 py-0.5 rounded uppercase tracking-wider">Theater View</span>
+                  <h2 className="text-sm font-bold text-white truncate mt-1 tracking-tight">{activeVideo.title}</h2>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setIsMiniPlayer(true)}
+                    className="h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer"
+                    title="Minimize — keep watching while you browse"
+                  >
+                    <Minimize2 size={14} />
+                  </button>
+                  <button
+                    onClick={handleCloseVideo}
+                    className="h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer"
+                    title="Close"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 bg-black relative flex items-center justify-center aspect-video min-h-[300px]">
+                {isPpvLocked ? (
+                  <div className="absolute inset-0 bg-[#0e0e11]/90 backdrop-blur-md p-6 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto z-10">
+                    <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+                      <Lock size={20} className={isCheckingPpv ? "animate-pulse" : ""} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-white tracking-tight">Pay-Per-View Locked Asset</h3>
+                      <p className="text-xs text-neutral-400 mt-1.5 leading-normal">This specific video item requires an individual standalone micro-payment access token to unlock viewing credentials.</p>
+                    </div>
+                    <div className="bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-center w-full">
+                      <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">Video Pricing Fee</span>
+                      <p className="text-xl font-black text-amber-400 mt-0.5">TSh {parseInt(activeVideo.price).toLocaleString()}</p>
+                    </div>
+                    <button
+                      disabled={isCheckingPpv}
+                      onClick={() => handleProcessLocalPPV(activeVideo)}
+                      className={`w-full font-extrabold py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer
+                        ${isCheckingPpv
+                          ? 'bg-neutral-800 text-neutral-500 border border-white/5 shadow-none animate-pulse cursor-not-allowed'
+                          : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black shadow-amber-500/10 active:scale-[0.99]'
+                        }`}
+                    >
+                      {isCheckingPpv && (
+                        <RefreshCw size={12} className="animate-spin text-amber-500" />
+                      )}
+                      {isCheckingPpv ? ppvStatusText : `Pay TSh ${parseInt(activeVideo.price).toLocaleString()} to Unlock`}
+                    </button>
+                  </div>
+                ) : activeVideo.videoUrl?.trim().startsWith('<iframe') ? (
+                  // Vimeo / Bunny / any raw <iframe embed> saved by the admin dashboard
+                  <div
+                    className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full"
+                    dangerouslySetInnerHTML={{ __html: activeVideo.videoUrl }}
+                  />
+                ) : (
+                  // Direct playable file (e.g. Supabase-hosted upload)
+                  <video
+                    src={activeVideo.videoUrl}
+                    controls
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       {/* GATEWAY ENTRY PAYWALL CONTROLLER WITH SPOTLIGHT ASSIST */}
