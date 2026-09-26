@@ -38,7 +38,7 @@ export default function PlayHubHome() {
   // Navigation & Core Content
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isSiteLocked, setIsSiteLocked] = useState(false);
+  const [isSiteLocked, setIsSiteLocked] = useState(true);
   const [activeChip, setActiveChip] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -372,6 +372,11 @@ export default function PlayHubHome() {
     // layer sits over everything (near-black + grain, matching the reference look).
     <div className="h-screen w-full bg-[#07070a] text-[#f8fafc] font-sans antialiased selection:bg-[#ef4444]/30 overflow-hidden relative">
 
+      {/* BACKGROUND IMAGE — full-bleed static backdrop behind the whole home feed */}
+      <div className="fixed inset-0 z-0 bg-center bg-cover" style={{ backgroundImage: "url('11.jpg')" }}>
+        <div className="absolute inset-0 bg-black/50" />
+     </div>
+
       {/* FILM GRAIN — persistent, tiled, sits above the background but below UI */}
       <div
         className="fixed inset-0 z-[1] pointer-events-none opacity-[0.16] mix-blend-overlay"
@@ -652,8 +657,8 @@ export default function PlayHubHome() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-hidden group/bg">
 
           <div className="absolute inset-0 w-full h-full z-0 overflow-hidden pointer-events-none select-none">
-            <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-black/50 to-[#09090b] z-20" />
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-all duration-500 z-10
+            <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-black/20 to-[#09090b] z-20" />
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[0px] transition-all duration-500 z-0
               group-hover/bg:bg-black/10
               [background:radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.65)_60%)]"
             />
@@ -661,8 +666,8 @@ export default function PlayHubHome() {
               src="/11.jpg"
               alt="Cinematic Background Backdrop"
               className="w-full h-full object-cover object-center transition-all duration-700 ease-out
-                opacity-40 scale-[1.01]
-                group-hover/bg:opacity-90 group-hover/bg:scale-[1.04]"
+                opacity-100 scale-[1]
+                group-hover/bg:opacity-100 group-hover/bg:scale-[1]"
               onError={(e) => { e.target.onerror = null; e.target.src = FALLBACK_THUMB; }}
             />
           </div>
@@ -680,7 +685,7 @@ export default function PlayHubHome() {
             <div className="bg-black/40 border border-white/5 rounded-2xl p-4 text-center relative overflow-hidden backdrop-blur-sm">
               <p className="text-[11px] font-bold text-[#aaa] uppercase tracking-widest">Handshake Passcode Fee</p>
               <h2 className="text-3xl font-black text-white mt-1 flex items-center justify-center gap-1">
-                TSh 20,000 <span className="text-xs font-semibold text-[#888] uppercase tracking-normal">/ Full pass</span>
+                TSh 5,000 <span className="text-xs font-semibold text-[#888] uppercase tracking-normal">/ Full pass</span>
               </h2>
             </div>
 
