@@ -18,13 +18,18 @@ import {
   Layers
 } from 'lucide-react';
 
-// Terabyte Infrastructure Connection Credentials
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1YWl4Y29sZHlqcmN5aWJlc2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAsImV4cCI6MjAwMH0.sample';
+// Database Connection Credentials
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ;
+
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function AdminDashboard() {
+   //admin key
+  const KEY = process.env.NEXT_PUBLIC_PLAYHUB_SECRET_KEY || 'playhub2026';
+
+
   // Security Gate States
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passcode, setPasscode] = useState('');
@@ -50,11 +55,14 @@ export default function AdminDashboard() {
   const [videoFileName, setVideoStatusName] = useState('Select high-capacity film asset from disk');
   const [rawFileObject, setRawFileObject] = useState(null);
   
-  // TERABYTE TRACKING STATES: Real-Time Speed & Capacity Metrics
+  // DATABASE TRACKING STATES
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadSpeed, setUploadSpeed] = useState('');
 
-  const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api';
+  const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL ;
+  
+
+
 
   useEffect(() => {
     const sessionAuth = window.sessionStorage.getItem('playhub_admin_auth');
@@ -64,7 +72,7 @@ export default function AdminDashboard() {
     fetchUploadedVideos();
   }, []);
 
-  // HYBRID FETCH: Merges live database rows with local storage rows seamlessly
+  // HYBRID FETCH
   const fetchUploadedVideos = async () => {
     let dbVideos = [];
     let localVideos = [];
@@ -114,7 +122,7 @@ export default function AdminDashboard() {
     setVideoProvider('local_file');
   };
 
-    // SMART LINK TRANSLATOR: Normalizes raw text codes into valid player components
+    // SMART LINK TRANSLATOR
   const compileVideoDescription = (overrideUrl) => {
     if (videoProvider === 'local_file') return overrideUrl || '';
     const linkInput = videoUrl.trim();
@@ -124,7 +132,7 @@ export default function AdminDashboard() {
     }
     if (videoProvider === 'vimeo') {
       const cleanId = linkInput.replace(/\D/g, '');
-      return `<iframe src="https://vimeo.com{cleanId}" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+      return `<iframe src="https://vimeo.com{cleanId}?autoplay=1&title=0&byline=0&portrait=0" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
     }
     if (videoProvider === 'bunny') {
       return `<iframe src="${linkInput}" loading="lazy" style="border:0;position:absolute;top:0;height:100%;width:100%;" allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;" allowfullscreen="true"></iframe>`;
@@ -180,7 +188,7 @@ export default function AdminDashboard() {
     const fixedUnifiedId = "vid_" + Math.random().toString(36).substring(2, 11);
 
     try {
-      // 🚀 HIGH-CAPACITY PIPELINE: Streaming heavy files directly into the cloud bucket target
+      //  HIGH-CAPACITY PIPELINE
       if (videoProvider === 'local_file' && rawFileObject) {
         const fileExtension = rawFileObject.name.split('.').pop();
         const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
@@ -288,7 +296,7 @@ export default function AdminDashboard() {
               <p className="text-[11px] text-[#888] font-medium mt-0.5">Administrative Auth Verification</p>
             </div>
           </div>
-          <form onSubmit={(e) => { e.preventDefault(); if (passcode === 'playhub2026') { window.sessionStorage.setItem('playhub_admin_auth', 'verified'); setIsAuthenticated(true); } else { setAuthError('Incorrect system authorization passcode.'); } }} className="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); if (passcode === KEY) { window.sessionStorage.setItem('playhub_admin_auth', 'verified'); setIsAuthenticated(true); } else { setAuthError('Incorrect system authorization passcode.'); } }} className="space-y-4">
             <div className="space-y-1.5">
               <label className="block text-[10px] uppercase font-bold tracking-widest text-[#666]">Security Token</label>
               <input type="password" placeholder="••••••••" value={passcode} onChange={(e) => setPasscode(e.target.value)} className="w-full bg-[#161d19] border border-[#26332d] rounded-xl px-4 py-3 text-sm text-white font-mono outline-none focus:border-[#ff3b3b] transition-all" />

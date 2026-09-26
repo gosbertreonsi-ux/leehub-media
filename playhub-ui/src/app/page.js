@@ -107,7 +107,7 @@ export default function PlayHubHome() {
 
     // NORMALIZE: AdminDashboard saves videos as { thumb, length, desc, ... }
     // while this screen reads { thumbnailUrl, duration, videoUrl, ... } — map them here
-    // so nothing downstream has to know about the admin's field names.
+
     const normalized = Array.from(compositeMap.values()).map((v) => {
       const thumbIsUsableUrl = v.thumb && !v.thumb.startsWith('linear');
       return {
@@ -118,9 +118,7 @@ export default function PlayHubHome() {
       };
     });
 
-    // No slicing/capping here on purpose — every video that comes back from
-    // the backend or local cache stays in the feed, whether that's 10 or 1000.
-    // The grid below renders in normal document flow, so the browser's own
+
     // scrolling handles however many cards that turns out to be.
     const finalSynchronizedFeed = normalized.sort((a, b) =>
       new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0)
@@ -141,7 +139,7 @@ export default function PlayHubHome() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`${BACKEND_API_URL}/payments/status/${currentTransactionId}`);
+        const res = await fetch(`${BACKEND_API_URL}/api/payments/status/${currentTransactionId}`);
         const data = await res.json();
 
         if (data.status === 'completed' || data.status === 'success') {
@@ -172,7 +170,7 @@ export default function PlayHubHome() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`${BACKEND_API_URL}/payments/status/${currentPpvTxId}`);
+        const res = await fetch(`${BACKEND_API_URL}/api/payments/status/${currentPpvTxId}`);
         const data = await res.json();
 
         if (data.status === 'completed' || data.status === 'success') {
