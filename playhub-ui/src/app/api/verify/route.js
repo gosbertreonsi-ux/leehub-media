@@ -24,11 +24,9 @@ export async function GET(request) {
 
   console.log(`[Gateway API] Checking status for ${transactionId} - Poll Request Count: ${currentAttempts}`);
 
-  // 🎯 VERIFICATION STATE ROUTER SIMULATION:
-  // - Attempt 1 & 2: Simulates the user looking at their smartphone screen entering their carrier money wallet PIN code.
-  // - Attempt 3: Simulates mobile operators responding with successful clearing settlement status.
+  //  VERIFICATION STATE ROUTER SIMULATION:
+  
   if (currentAttempts >= 3) {
-    // Clear out cache registry log safely to free server memory overhead limits
     delete global.mockDatabaseState[transactionId];
 
     return NextResponse.json({

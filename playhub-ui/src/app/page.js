@@ -5,7 +5,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Play,
   Search,
-  Tv,
   Compass,
   Film,
   Lock,
@@ -14,7 +13,8 @@ import {
   Clock,
   X,
   Minimize2,
-  Maximize2
+  Maximize2,
+  ArrowRight
 } from 'lucide-react';
 
 // Placeholder thumbnail — self-contained SVG so it never depends on an external host
@@ -33,12 +33,16 @@ const FALLBACK_THUMB =
 const NOISE_BG =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
+// Height of the fixed hero banner — kept in one place since both the banner
+// and the scroll spacer beneath it need to agree on the exact value.
+const BANNER_HEIGHT = 'h-[320px] md:h-[420px]';
+
 export default function PlayHubHome() {
   //STATE VARIABLES
   // Navigation & Core Content
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isSiteLocked, setIsSiteLocked] = useState(false);
+  const [isSiteLocked, setIsSiteLocked] = useState(true);
   const [activeChip, setActiveChip] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -118,8 +122,6 @@ export default function PlayHubHome() {
       };
     });
 
-
-    // scrolling handles however many cards that turns out to be.
     const finalSynchronizedFeed = normalized.sort((a, b) =>
       new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0)
     );
@@ -155,7 +157,6 @@ export default function PlayHubHome() {
           setPayError('Payment was not completed. Please try again.');
           setPayStatusText('Pay with M-Pesa');
         }
-        // otherwise still pending — keep polling
       } catch (err) {
         console.error('Payment status poll failed:', err);
       }
@@ -186,7 +187,6 @@ export default function PlayHubHome() {
           setCurrentPpvTxId(null);
           setPpvStatusText(`Pay TSh ${parseInt(activeVideo.price).toLocaleString()} to Unlock`);
         }
-        // otherwise still pending — keep polling
       } catch (err) {
         console.error('PPV status poll failed:', err);
       }
@@ -366,14 +366,46 @@ export default function PlayHubHome() {
   });
 
   return (
-    // Root frame: <main> below is the single scrollable region. A fixed film-grain
-    // layer sits over everything (near-black + grain, matching the reference look).
+    // Root frame. The banner below is `fixed` — pinned to the viewport, it
+    // never moves. <main> is the only scrolling region; its content (which
+    // has its own solid background) rides on top of the banner and visually
+    // slides up to cover it as the user scrolls, so only the cards move.
     <div className="h-screen w-full bg-[#07070a] text-[#f8fafc] font-sans antialiased selection:bg-[#ef4444]/30 overflow-hidden relative">
 
-      {/* BACKGROUND IMAGE — full-bleed static backdrop behind the whole home feed */}
-      <div className="fixed inset-0 z-0 bg-center bg-cover" style={{ backgroundImage: "url('BG.jpg')" }}>
-        <div className="absolute inset-0 bg-black/50" />
-     </div>
+      {/* FIXED CINEMATIC HERO BANNER — one div, pinned, never scrolls */}
+      <div className={`fixed top-0 inset-x-0 z-0 w-full ${BANNER_HEIGHT} overflow-hidden bg-neutral-950`}>
+        <div className="absolute inset-0 z-20 pointer-events-none opacity-[0.015]" style={{ backgroundImage: NOISE_BG }} />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#070709] via-transparent to-[#070709]/80 z-10 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#070709]/90 via-[#070709]/40 to-transparent z-10 pointer-events-none" />
+
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          src="/11.mp4"
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-60"
+        />
+
+        <div className="absolute inset-0 z-20 flex flex-col justify-end p-6 md:p-10 space-y-3.5 max-w-xl">
+          <div className="space-y-1.5">
+            <span className="text-[10px] text-amber-400 font-black uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md">Trending Cinema</span>
+            <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white leading-none">THE DAR EXPEDITION</h1>
+            <p className="text-xs text-neutral-400 font-medium leading-relaxed line-clamp-2 md:line-clamp-none">
+              Stream feature-length Tanzanian cinematic assets instantly. Experience high-definition action and documentaries cleared seamlessly via local mobile money channels.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <button className="bg-white hover:bg-neutral-200 text-black text-xs font-black px-5 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer shadow-lg">
+              <Play size={13} className="fill-current" /> Watch Trailer
+            </button>
+            <button className="bg-white/10 hover:bg-white/15 border border-white/5 text-white text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer">
+              More Info
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* FILM GRAIN — persistent, tiled, sits above the background but below UI */}
       <div
@@ -384,10 +416,10 @@ export default function PlayHubHome() {
       {/* FLOATING MINIMAL NAV */}
       <nav className="fixed top-0 inset-x-0 z-40 flex items-center justify-between gap-4 px-6 py-4 bg-gradient-to-b from-black/85 via-black/30 to-transparent pointer-events-none">
         <div className="flex items-center gap-2.5 shrink-0 select-none pointer-events-auto">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#ef4444] to-[#b91c1c] text-white shadow-lg shadow-red-900/20">
-            <Tv className="h-5 w-5" />
+          <div className="flex h-8 w-12 items-center justify-center rounded-md bg-[#ef4444]">
+            <Play className="h-4 w-4 text-white fill-white ml-0.5" />
           </div>
-          <span className="text-xl font-black tracking-wider bg-gradient-to-r from-white to-neutral-400 bg-clip-text text-transparent">PLAYHUB</span>
+          <span className="text-xl font-black tracking-wider text-white">PLAYHUB</span>
         </div>
 
         <div className="relative max-w-md w-full hidden md:block pointer-events-auto">
@@ -397,16 +429,16 @@ export default function PlayHubHome() {
             placeholder="Search premium videos, channels..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-black/40 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-[#ef4444] backdrop-blur-md transition-all"
+            className="w-full bg-black/40 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-[#ef4444] backdrop-blur-md"
           />
         </div>
 
         <div className="flex items-center gap-3 pointer-events-auto">
-          <button className="p-2 text-neutral-300 hover:text-white rounded-xl hover:bg-white/10 transition-all">
+          <button className="p-2 text-neutral-300 hover:text-white rounded-xl hover:bg-white/10">
             <Compass className="h-5 w-5" />
           </button>
           <div className="h-8 w-px bg-white/10" />
-          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-neutral-700 to-neutral-500 border border-neutral-600 flex items-center justify-center text-xs font-bold text-white select-none">PH</div>
+          <div className="h-8 w-8 rounded-full bg-neutral-700 border border-neutral-600 flex items-center justify-center text-xs font-bold text-white select-none">PH</div>
         </div>
       </nav>
 
@@ -417,7 +449,7 @@ export default function PlayHubHome() {
             <button
               key={chip}
               onClick={() => setActiveChip(chip)}
-              className={`px-3.5 py-1.5 text-[11px] font-bold rounded-xl whitespace-nowrap transition-all border ${
+              className={`px-3.5 py-1.5 text-[11px] font-bold rounded-xl whitespace-nowrap border ${
                 activeChip === chip
                   ? 'bg-white text-black border-white shadow-md'
                   : 'bg-transparent text-neutral-300 border-transparent hover:text-white hover:bg-white/10'
@@ -429,101 +461,103 @@ export default function PlayHubHome() {
         </div>
       </div>
 
-      {/* MAIN SCROLL REGION — a normal document-flow grid, so it scrolls the
-          ordinary way and every matching video (10 or 1000+) is reachable by
-          just scrolling, instead of being pinned/measured/animated in. */}
-      <main ref={mainRef} className={`relative z-0 h-screen w-full scroll-smooth ${isSiteLocked ? 'overflow-hidden' : 'overflow-y-scroll'}`}>
-        <div className="w-full px-4 sm:px-6 pt-32 pb-16">
-          {loading ? (
-            <div className="flex justify-center mt-24">
-              <span className="text-[10px] tracking-[0.3em] text-neutral-600 uppercase">Loading streams…</span>
-            </div>
-          ) : filteredVideos.length === 0 ? (
-            <div className="text-center px-6 mt-24">
-              <Film className="h-8 w-8 text-neutral-700 mx-auto mb-2" />
-              <p className="text-xs text-neutral-500">No media streams match your filters.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10 max-w-[1400px] mx-auto">
-              {filteredVideos.map((video) => {
-                const itemPrice = parseInt(video.price);
-                const isPremium = !isNaN(itemPrice) && itemPrice > 0;
+      {/* MAIN SCROLL REGION */}
+      <main
+        ref={mainRef}
+        className={`relative z-10 h-screen w-full scroll-smooth ${isSiteLocked ? 'overflow-hidden' : 'overflow-y-scroll'}`}
+      >
+        {/* Transparent spacer — lets the fixed banner show through untouched */}
+        <div className={`${BANNER_HEIGHT} w-full pointer-events-none`} />
 
-                return (
-                  <div
-                    key={video.id}
-                    onClick={() => handleVerifyVideoAccess(video)}
-                    className="group cursor-pointer flex flex-col"
-                  >
-                    {/* Thumbnail — background-cover so any source image, whatever
-                        its native size, fills the frame edge-to-edge without
-                        stretching or letterboxing. */}
+        {/* Solid card surface — this is what visually "covers" the banner */}
+        <div className="bg-[#08080c] rounded-t-3xl min-h-[calc(100vh-1px)]">
+          <div className="w-full px-4 sm:px-6 pt-14 pb-16">
+            {loading ? (
+              <div className="flex justify-center mt-24">
+                <span className="text-[10px] tracking-[0.3em] text-neutral-600 uppercase">Loading streams…</span>
+              </div>
+            ) : filteredVideos.length === 0 ? (
+              <div className="text-center px-6 mt-24">
+                <Film className="h-8 w-8 text-neutral-700 mx-auto mb-2" />
+                <p className="text-xs text-neutral-500">No media streams match your filters.</p>
+              </div>
+            ) : (
+
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-8 max-w-[1800px] mx-auto">
+                {filteredVideos.map((video) => {
+                  const itemPrice = parseInt(video.price);
+                  const isPremium = !isNaN(itemPrice) && itemPrice > 0;
+
+                  return (
                     <div
-                      className="relative w-full aspect-video rounded-2xl overflow-hidden bg-neutral-900 bg-center bg-cover ring-1 ring-white/10 group-hover:ring-white/25 transition-all"
-                      style={{
-                        backgroundImage: `url(${video.thumbnailUrl || FALLBACK_THUMB})`,
-                      }}
+                      key={video.id}
+                      onClick={() => handleVerifyVideoAccess(video)}
+                      className="group cursor-pointer flex flex-col"
                     >
-                      <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                        {isPremium ? (
-                          <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-md backdrop-blur-md uppercase tracking-wider">Premium</span>
-                        ) : (
-                          <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-md backdrop-blur-md uppercase tracking-wider">Free</span>
-                        )}
-                      </div>
-
-                      <div className="absolute bottom-2.5 right-2.5 bg-black/75 px-1.5 py-0.5 rounded text-[11px] font-bold text-neutral-200 tracking-tight">
-                        {video.duration || '0:00'}
-                      </div>
-
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-300">
-                        <div className="h-14 w-14 rounded-full bg-white/90 text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-all duration-300">
-                          <Play className="h-6 w-6 fill-current ml-0.5" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Meta row — YouTube-style: channel avatar, title, then a
-                        secondary line of channel · time-ago (· price when paid). */}
-                    <div className="flex items-start gap-3 mt-3">
-                      <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-tr from-neutral-700 to-neutral-500 border border-neutral-600 flex items-center justify-center text-xs font-bold text-white select-none">
-                        {(video.channel || 'PH').slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-[15px] leading-snug text-neutral-100 group-hover:text-white transition-colors tracking-tight line-clamp-2">
-                          {video.title}
-                        </h3>
-                        <p className="text-[13px] text-neutral-400 mt-1 font-medium truncate">
-                          {video.channel || 'PlayHub Streamer'}
-                        </p>
-                        <div className="flex items-center gap-1.5 text-[12px] text-neutral-500 font-semibold mt-0.5">
-                          <span className="flex items-center gap-1"><Clock size={11} /> {getTimeAgo(video.uploadedAt)}</span>
-                          {isPremium && (
-                            <>
-                              <span className="text-neutral-600">·</span>
-                              <span className="text-amber-400 font-extrabold">TSh {parseInt(video.price).toLocaleString()}</span>
-                            </>
+                      <div
+                        className="relative w-full aspect-video rounded-2xl overflow-hidden bg-neutral-900 bg-center bg-cover ring-1 ring-white/10"
+                        style={{
+                          backgroundImage: `url(${video.thumbnailUrl || FALLBACK_THUMB})`,
+                        }}
+                      >
+                        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                          {isPremium ? (
+                            <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-md backdrop-blur-md uppercase tracking-wider">Premium</span>
+                          ) : (
+                            <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-md backdrop-blur-md uppercase tracking-wider">Free</span>
                           )}
                         </div>
+
+                        <div className="absolute bottom-2.5 right-2.5 bg-black/75 px-1.5 py-0.5 rounded text-[11px] font-bold text-neutral-200 tracking-tight">
+                          {video.duration || '0:00'}
+                        </div>
+
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center">
+                          <div className="h-14 w-14 rounded-full bg-white/90 text-black flex items-center justify-center shadow-lg">
+                            <Play className="h-6 w-6 fill-current ml-0.5" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3 mt-3">
+                        <div className="h-10 w-10 shrink-0 rounded-full bg-neutral-700 border border-neutral-600 flex items-center justify-center text-xs font-bold text-white select-none">
+                          {(video.channel || 'PH').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-[15px] leading-snug text-neutral-100 group-hover:text-white tracking-tight line-clamp-2">
+                            {video.title}
+                          </h3>
+                          <p className="text-[13px] text-neutral-400 mt-1 font-medium truncate">
+                            {video.channel || 'PlayHub Streamer'}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-[12px] text-neutral-500 font-semibold mt-0.5">
+                            <span className="flex items-center gap-1"><Clock size={11} /> {getTimeAgo(video.uploadedAt)}</span>
+                            {isPremium && (
+                              <>
+                                <span className="text-neutral-600">·</span>
+                                <span className="text-amber-400 font-extrabold">TSh {parseInt(video.price).toLocaleString()}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
-      {/* VIDEO LIGHTBOX PLAYER — ONE persistent tree for both full & mini modes.
-          Only className/text changes between modes; the <video>/<iframe> node itself
-          never unmounts, so playback position and "playing" state survive the toggle. */}
+      {/* VIDEO LIGHTBOX PLAYER */}
       {activeVideo && (
         <div
           className={
             isMiniPlayer
-              ? 'fixed bottom-4 right-4 z-50 w-64 sm:w-80 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 border border-[#27272a] bg-[#0e0e11] animate-fadeIn transition-all duration-300'
-              : 'fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn'
+              ? 'fixed bottom-4 right-4 z-50 w-64 sm:w-80 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 border border-[#27272a] bg-[#0e0e11]'
+              : 'fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md'
           }
         >
           <div
@@ -559,8 +593,8 @@ export default function PlayHubHome() {
                   onClick={() => setIsMiniPlayer(!isMiniPlayer)}
                   className={
                     isMiniPlayer
-                      ? 'h-6 w-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-300 hover:text-white transition-all cursor-pointer'
-                      : 'h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer'
+                      ? 'h-6 w-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-300 hover:text-white cursor-pointer'
+                      : 'h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center cursor-pointer'
                   }
                   title={isMiniPlayer ? 'Expand' : 'Minimize — keep watching while you browse'}
                 >
@@ -570,8 +604,8 @@ export default function PlayHubHome() {
                   onClick={handleCloseVideo}
                   className={
                     isMiniPlayer
-                      ? 'h-6 w-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-300 hover:text-white transition-all cursor-pointer'
-                      : 'h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center transition-all cursor-pointer'
+                      ? 'h-6 w-6 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-300 hover:text-white cursor-pointer'
+                      : 'h-8 w-8 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl flex items-center justify-center cursor-pointer'
                   }
                   title="Close"
                 >
@@ -599,7 +633,7 @@ export default function PlayHubHome() {
                 ) : (
                   <div className="absolute inset-0 bg-[#0e0e11]/90 backdrop-blur-md p-6 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto z-10">
                     <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
-                      <Lock size={20} className={isCheckingPpv ? "animate-pulse" : ""} />
+                      <Lock size={20} />
                     </div>
                     <div>
                       <h3 className="text-base font-black text-white tracking-tight">Pay-Per-View Locked Asset</h3>
@@ -612,10 +646,10 @@ export default function PlayHubHome() {
                     <button
                       disabled={isCheckingPpv}
                       onClick={() => handleProcessLocalPPV(activeVideo)}
-                      className={`w-full font-extrabold py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer
+                      className={`w-full font-extrabold py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 cursor-pointer
                         ${isCheckingPpv
-                          ? 'bg-neutral-800 text-neutral-500 border border-white/5 shadow-none animate-pulse cursor-not-allowed'
-                          : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black shadow-amber-500/10 active:scale-[0.99]'
+                          ? 'bg-neutral-800 text-neutral-500 border border-white/5 shadow-none cursor-not-allowed'
+                          : 'bg-amber-500 hover:bg-amber-600 text-black shadow-amber-500/10'
                         }`}
                     >
                       {isCheckingPpv && (
@@ -626,16 +660,11 @@ export default function PlayHubHome() {
                   </div>
                 )
               ) : activeVideo.videoUrl?.trim().startsWith('<iframe') ? (
-                // Vimeo / Bunny / any raw <iframe embed> saved by the admin dashboard
-                // — this stays mounted across mode switches, so playback continues.
                 <div
                   className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full"
                   dangerouslySetInnerHTML={{ __html: activeVideo.videoUrl }}
                 />
               ) : (
-                // Direct playable file — this <video> node stays mounted across mode
-                // switches (same tree position in both branches), so currentTime and
-                // "playing" state are preserved instead of restarting from 0.
                 <video
                   src={activeVideo.videoUrl}
                   controls
@@ -650,23 +679,22 @@ export default function PlayHubHome() {
         </div>
       )}
 
-      {/* GATEWAY ENTRY PAYWALL CONTROLLER WITH SPOTLIGHT ASSIST */}
+      {/* GATEWAY ENTRY PAYWALL CONTROLLER */}
       {isSiteLocked && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-hidden group/bg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-hidden">
 
           <div className="absolute inset-0 w-full h-full z-0 overflow-hidden pointer-events-none select-none">
             <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-black/20 to-[#09090b] z-20" />
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[0px] transition-all duration-500 z-0
-              group-hover/bg:bg-black/10
+            <div className="absolute inset-0 bg-black/40 z-0
               [background:radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.65)_60%)]"
             />
-            <img
-              src="/11.jpg"
-              alt="Cinematic Background Backdrop"
-              className="w-full h-full object-cover object-center transition-all duration-700 ease-out
-                opacity-100 scale-[1]
-                group-hover/bg:opacity-100 group-hover/bg:scale-[1]"
-              onError={(e) => { e.target.onerror = null; e.target.src = FALLBACK_THUMB; }}
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              src="/11.mp4"
+              className="w-full h-full object-cover object-center opacity-40"
             />
           </div>
 
@@ -674,22 +702,28 @@ export default function PlayHubHome() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-xl bg-[#ef4444]/10 border border-[#ef4444]/20 flex items-center justify-center text-[#ef4444]">
-                  <Lock size={16} className={isCheckingPayment ? "animate-pulse" : ""} />
+                  <Lock size={16} />
                 </div>
                 <span className="font-bold text-sm tracking-tight text-white">Premium Access Gate</span>
+
+                {/*FREE ACCESS BUTTON PER NOW */}
+                    <button onClick={() => setIsSiteLocked(false)} className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#141c18] border border-[#222c26] text-[#aaa] hover:text-white hover:border-[#ff3b3b] transition-all duration-200"
+>                     <ArrowRight size={16} />
+                    </button>
+
               </div>
             </div>
 
             <div className="bg-black/40 border border-white/5 rounded-2xl p-4 text-center relative overflow-hidden backdrop-blur-sm">
               <p className="text-[11px] font-bold text-[#aaa] uppercase tracking-widest">Handshake Passcode Fee</p>
               <h2 className="text-3xl font-black text-white mt-1 flex items-center justify-center gap-1">
-                FREE <span className="text-xs font-semibold text-[#888] uppercase tracking-normal"></span>
+                TSHS 20,000/=<span className="text-xs font-semibold text-[#888] uppercase tracking-normal"></span>
               </h2>
             </div>
 
             <div className="grid grid-cols-2 gap-1.5 p-1 bg-black/50 border border-white/5 rounded-xl backdrop-blur-sm">
-              <button disabled={isCheckingPayment} onClick={(e) => handleMethodTabSwitch(e, 'momo')} className={`py-2.5 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${isCheckingPayment ? 'opacity-40 cursor-not-allowed' : ''} ${paymentMethod === 'momo' ? 'bg-[#ef4444] text-white shadow-md' : 'text-[#aaa] hover:text-white'}`}>Mobile Money</button>
-              <button disabled={isCheckingPayment} onClick={(e) => handleMethodTabSwitch(e, 'card')} className={`py-2.5 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${isCheckingPayment ? 'opacity-40 cursor-not-allowed' : ''} ${paymentMethod === 'card' ? 'bg-[#ef4444] text-white shadow-md' : 'text-[#aaa] hover:text-white'}`}>Credit Card</button>
+              <button disabled={isCheckingPayment} onClick={(e) => handleMethodTabSwitch(e, 'momo')} className={`py-2.5 text-xs font-bold rounded-lg cursor-pointer flex items-center justify-center gap-1.5 ${isCheckingPayment ? 'opacity-40 cursor-not-allowed' : ''} ${paymentMethod === 'momo' ? 'bg-[#ef4444] text-white shadow-md' : 'text-[#aaa] hover:text-white'}`}>Mobile Money</button>
+              <button disabled={isCheckingPayment} onClick={(e) => handleMethodTabSwitch(e, 'card')} className={`py-2.5 text-xs font-bold rounded-lg cursor-pointer flex items-center justify-center gap-1.5 ${isCheckingPayment ? 'opacity-40 cursor-not-allowed' : ''} ${paymentMethod === 'card' ? 'bg-[#ef4444] text-white shadow-md' : 'text-[#aaa] hover:text-white'}`}>Credit Card</button>
             </div>
 
             <form onSubmit={handleSiteGateSubmit} className="space-y-4">
@@ -698,24 +732,24 @@ export default function PlayHubHome() {
                   <label className="text-[10px] text-[#aaa] font-bold uppercase tracking-widest block">Select Mobile Operator</label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {['mpesa', 'tigopesa', 'airtel', 'halopesa'].map((op) => (
-                      <button key={op} disabled={isCheckingPayment} type="button" onClick={(e) => handleOperatorSwitch(e, op)} className={`py-2 text-[10px] font-extrabold rounded-lg border uppercase tracking-wider transition-all duration-200 cursor-pointer ${isCheckingPayment ? 'opacity-40 cursor-not-allowed' : ''} ${selectedOp === op ? 'border-[#ef4444] bg-[#ef4444]/10 text-white' : 'border-white/5 bg-black/20 text-[#aaa] hover:text-white'}`}>{op.replace('pesa', '')}</button>
+                      <button key={op} disabled={isCheckingPayment} type="button" onClick={(e) => handleOperatorSwitch(e, op)} className={`py-2 text-[10px] font-extrabold rounded-lg border uppercase tracking-wider cursor-pointer ${isCheckingPayment ? 'opacity-40 cursor-not-allowed' : ''} ${selectedOp === op ? 'border-[#ef4444] bg-[#ef4444]/10 text-white' : 'border-white/5 bg-black/20 text-[#aaa] hover:text-white'}`}>{op.replace('pesa', '')}</button>
                     ))}
                   </div>
                   <div>
                     <label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Tanzanian Mobile Number</label>
                     <div className="relative">
                       <span className="absolute left-4 top-3 text-xs font-bold text-[#666]">+255</span>
-                      <input disabled={isCheckingPayment} type="tel" placeholder="740 462 193" value={momoPhone} onChange={handlePhoneInput} className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-14 pr-4 text-xs text-white font-semibold outline-none focus:border-[#ef4444] focus:bg-black/60 transition-all disabled:opacity-50" />
+                      <input disabled={isCheckingPayment} type="tel" placeholder="740 462 193" value={momoPhone} onChange={handlePhoneInput} className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-14 pr-4 text-xs text-white font-semibold outline-none focus:border-[#ef4444] focus:bg-black/60 disabled:opacity-50" />
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Cardholder Name</label><input disabled={isCheckingPayment} type="text" placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#ef4444] focus:bg-black/60 transition-all disabled:opacity-50" /></div>
-                  <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Card Number</label><input disabled={isCheckingPayment} type="text" placeholder="4000 1234 5678 9010" value={cardNum} onChange={handleCardNumInput} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#ef4444] focus:bg-black/60 transition-all disabled:opacity-50" /></div>
+                  <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Cardholder Name</label><input disabled={isCheckingPayment} type="text" placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#ef4444] focus:bg-black/60 disabled:opacity-50" /></div>
+                  <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Card Number</label><input disabled={isCheckingPayment} type="text" placeholder="4000 1234 5678 9010" value={cardNum} onChange={handleCardNumInput} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#ef4444] focus:bg-black/60 disabled:opacity-50" /></div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Expiry Date</label><input disabled={isCheckingPayment} type="text" placeholder="MM/YY" value={cardExp} onChange={handleCardExpInput} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white text-center outline-none focus:border-[#ef4444] focus:bg-black/60 transition-all disabled:opacity-50" /></div>
-                    <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">CVC</label><input disabled={isCheckingPayment} type="password" placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white text-center outline-none focus:border-[#ef4444] focus:bg-black/60 transition-all disabled:opacity-50" /></div>
+                    <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">Expiry Date</label><input disabled={isCheckingPayment} type="text" placeholder="MM/YY" value={cardExp} onChange={handleCardExpInput} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white text-center outline-none focus:border-[#ef4444] focus:bg-black/60 disabled:opacity-50" /></div>
+                    <div><label className="block text-xs text-[#aaa] mb-1.5 font-bold tracking-tight">CVC</label><input disabled={isCheckingPayment} type="password" placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white text-center outline-none focus:border-[#ef4444] focus:bg-black/60 disabled:opacity-50" /></div>
                   </div>
                 </div>
               )}
@@ -729,14 +763,14 @@ export default function PlayHubHome() {
               <button
                 type="submit"
                 disabled={isCheckingPayment}
-                className={`w-full text-white font-extrabold py-3.5 rounded-xl text-xs tracking-wider uppercase transition-all duration-300 shadow-lg flex items-center justify-center gap-2 cursor-pointer
+                className={`w-full text-white font-extrabold py-3.5 rounded-xl text-xs tracking-wider uppercase shadow-lg flex items-center justify-center gap-2 cursor-pointer
                   ${isCheckingPayment
-                    ? 'bg-neutral-800 text-neutral-400 border border-white/5 shadow-none animate-pulse cursor-not-allowed'
-                    : 'bg-gradient-to-r from-[#ef4444] to-[#b91c1c] shadow-red-900/10 hover:shadow-red-900/20 active:scale-[0.99]'
+                    ? 'bg-neutral-800 text-neutral-400 border border-white/5 shadow-none cursor-not-allowed'
+                    : 'bg-[#ef4444] shadow-red-900/10'
                   }`}
               >
                 {isCheckingPayment && (
-                  <RefreshCw size={13} className="animate-spin text-[#ef4444]" />
+                  <RefreshCw size={13} className="animate-spin text-white" />
                 )}
                 {payStatusText}
               </button>

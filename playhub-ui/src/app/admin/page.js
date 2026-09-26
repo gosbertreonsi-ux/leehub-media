@@ -315,7 +315,8 @@ export default function AdminDashboard() {
       <nav className="sticky top-0 z-40 flex items-center justify-between border-b border-[#1c2420] bg-[#070908]/90 backdrop-blur-md px-6 py-3.5">
         <div className="flex items-center gap-2.5 shrink-0">
           <div className="relative h-5 w-8 rounded-md bg-[#ff3b3b] flex items-center justify-center transition-all hover:scale-105 active:scale-[0.98]">
-            <div className="ml-0.5 border-y-[5px] border-l-[8px] border-y-transparent border-l-white" /></div>
+            <div className="ml-0.5 border-y-[5px] border-l-[8px] border-y-transparent border-l-white" />
+          </div>
           <span className="text-lg font-black tracking-tight text-white uppercase">PlayHub</span>
           <span className="bg-[#ff3b3b]/10 text-[#ff3b3b] border border-[#ff3b3b]/20 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider">Control Panel</span>
         </div>
