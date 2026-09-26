@@ -17,9 +17,8 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1YWl4Y29sZHlqcmN5aWJlc2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAsImV4cCI6MjAwMH0.sample';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-console.log("======================================================");
-console.log("🗄️ Secure Supabase Distributed Cloud Tunnel Connected.");
-console.log("======================================================");
+
+console.log("Secure Supabase Distributed Cloud Tunnel Connected.");
 
 // 1. Fetch Shared Video Feed List
 app.get('/api/videos', async (req, res) => {
@@ -100,5 +99,5 @@ app.post('/api/initialize-payment', (req, res) => { res.status(200).json({ succe
 app.get('/api/check-payment-status', (req, res) => { res.status(200).json({ status: "completed", paid: true }); });
 
 app.listen(PORT, () => {
-  console.log(`🚀 PlayHub Core Systems Active & Listening on Port ${PORT}`);
+  console.log(`PlayHub Core Systems Active & Listening on Port ${PORT}`);
 });
