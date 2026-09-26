@@ -38,7 +38,7 @@ export default function PlayHubHome() {
   // Navigation & Core Content
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isSiteLocked, setIsSiteLocked] = useState(true);
+  const [isSiteLocked, setIsSiteLocked] = useState(false);
   const [activeChip, setActiveChip] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -77,7 +77,7 @@ export default function PlayHubHome() {
     setIsMiniPlayer(false);
   };
 
-  const BACKEND_API_URL = '/api';
+  const BACKEND_API_URL = 'http://localhost:5000/api';
 
   //DATA FETCHING
   const fetchCloudVideos = async () => {
@@ -373,7 +373,7 @@ export default function PlayHubHome() {
     <div className="h-screen w-full bg-[#07070a] text-[#f8fafc] font-sans antialiased selection:bg-[#ef4444]/30 overflow-hidden relative">
 
       {/* BACKGROUND IMAGE — full-bleed static backdrop behind the whole home feed */}
-      <div className="fixed inset-0 z-0 bg-center bg-cover" style={{ backgroundImage: "url('11.jpg')" }}>
+      <div className="fixed inset-0 z-0 bg-center bg-cover" style={{ backgroundImage: "url('BG.jpg')" }}>
         <div className="absolute inset-0 bg-black/50" />
      </div>
 
@@ -685,7 +685,7 @@ export default function PlayHubHome() {
             <div className="bg-black/40 border border-white/5 rounded-2xl p-4 text-center relative overflow-hidden backdrop-blur-sm">
               <p className="text-[11px] font-bold text-[#aaa] uppercase tracking-widest">Handshake Passcode Fee</p>
               <h2 className="text-3xl font-black text-white mt-1 flex items-center justify-center gap-1">
-                TSh 5,000 <span className="text-xs font-semibold text-[#888] uppercase tracking-normal">/ Full pass</span>
+                FREE <span className="text-xs font-semibold text-[#888] uppercase tracking-normal"></span>
               </h2>
             </div>
 
