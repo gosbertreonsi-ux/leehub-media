@@ -366,10 +366,7 @@ export default function PlayHubHome() {
   });
 
   return (
-    // Root frame. The banner below is `fixed` — pinned to the viewport, it
-    // never moves. <main> is the only scrolling region; its content (which
-    // has its own solid background) rides on top of the banner and visually
-    // slides up to cover it as the user scrolls, so only the cards move.
+    // Root frame. 
     <div className="h-screen w-full bg-[#07070a] text-[#f8fafc] font-sans antialiased selection:bg-[#ef4444]/30 overflow-hidden relative">
 
       {/* FIXED CINEMATIC HERO BANNER — one div, pinned, never scrolls */}
