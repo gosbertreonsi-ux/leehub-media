@@ -59,7 +59,7 @@ app.post('/api/videos', async (req, res) => {
       .insert([{
         id: id,
         title: title,
-        channel: channel7,
+        channel: channel,
         length: length,
         price: price || '0',
         desc_source: desc,
