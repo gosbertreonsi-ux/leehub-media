@@ -7,16 +7,7 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-
-app.use(cors({
-  origin: [
-    'https://playhub-frontend-2cnb.vercel.app', // Your actual new frontend domain
-    'https://playhub-frontend.vercel.app',      // Your old fallback domain
-    'http://localhost:3000'                      // Local VS Code testing
-  ],
-  credentials: true
-}));
-
+app.use(cors());
 
 // FIXED
 app.use(bodyParser.json({ limit: '100mb' }));
