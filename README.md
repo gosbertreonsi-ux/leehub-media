@@ -9,7 +9,7 @@ PlayHub is a video streaming site built for Tanzanian content. Viewers pay a sma
 ### Home page
 The main feed with the hero banner, search, filter chips and video grid.
 
-![Home page](home.png)
+![Home page](dash.jpg)
 
 ### Access gate
 The pop-up shown when someone first opens the site. It takes the entry fee by mobile money or card.
