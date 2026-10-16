@@ -14,17 +14,17 @@ The main feed with the hero banner, search, filter chips and video grid.
 ### Access gate
 The pop-up shown when someone first opens the site. It takes the entry fee by mobile money or card.
 
-![Access gate](access-gate.png)
+![Access gate](pop.jpg)
 
 ### Video player
 Watch in theater mode, or shrink the player and keep browsing.
 
-![Video player](player.png)
+![Video player](pop1.jpg)
 
 ### Admin control panel
 Upload videos, set prices, add thumbnails and manage the feed.
 
-![Admin panel](admin.png)
+![Admin panel](admin.jpg)
 
 <!-- Put your images in docs/screenshots/ and keep the file names above, or change the paths to match yours. -->
 
